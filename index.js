@@ -8,14 +8,14 @@ import { createHandler } from './lib/server.mjs'
 import { Hub } from './lib/hub.mjs'
 import { registerTools } from './lib/tools.mjs'
 import { loadState, saveState, defaultState } from './lib/state.mjs'
-import { detectVersion } from './lib/version.mjs'
+import { detectVersion, pluginVersion } from './lib/version.mjs'
 import { statePath } from './lib/paths.mjs'
 import { pathExists } from './lib/util.mjs'
 
 export const name = 'dsh-sync-hub'
 export const inject = ['webServer', 'credentials', 'tools']
 
-const PLUGIN_VERSION = '0.1.0'
+const PLUGIN_VERSION = pluginVersion()
 
 export function apply(ctx, config = {}) {
   const logger = {

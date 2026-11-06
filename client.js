@@ -22,8 +22,10 @@ window.__ModuleLoader__.load({
     const NS = 'dsh-sync-hub';
     const PANEL_ID = 'dsh-sync-hub';
     const SECTION_ID = 'dsh-sync-hub';
-    const VERSION = '0.2.0';
     const PREFIX = '/dsh-sync-hub';
+    // 插件版本以服务端 /state 返回的 plugin.version 为准（读自 package.json），
+    // 这里的常量只是拿不到状态时的兜底。
+    const FALLBACK_VERSION = '0.3.0';
 
     /* ---------- 1. 文案 ---------- */
 
@@ -1086,7 +1088,7 @@ window.__ModuleLoader__.load({
 
         h(Card, { title: t('quickScope'), extra: h('span', { style: { fontSize: 10, color: C.dimmed } }, t('quickScopeHint')) }, h(ScopeQuickToggles, { hub, t })),
 
-        h('div', { style: { fontSize: 10, color: C.dimmed, marginTop: 6 } }, `${NS} v${VERSION}`),
+        h('div', { style: { fontSize: 10, color: C.dimmed, marginTop: 6 } }, `${NS} v${status?.plugin?.version || FALLBACK_VERSION}`),
       );
     }
 
@@ -1732,7 +1734,7 @@ window.__ModuleLoader__.load({
             : tab === 'scope'
               ? h(ScopeTab, { hub, t })
               : h(TransportTab, { hub, t }),
-        h('div', { style: { fontSize: 10, color: C.dimmed, marginTop: 8 } }, `${NS} v${VERSION}`),
+        h('div', { style: { fontSize: 10, color: C.dimmed, marginTop: 8 } }, `${NS} v${status?.plugin?.version || FALLBACK_VERSION}`),
       );
     }
 
