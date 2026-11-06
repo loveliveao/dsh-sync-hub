@@ -27,11 +27,17 @@
 ## 二、安装
 
 ```bash
-# 装进当前 profile（插件是组合包，装完需要重启 DSH 才生效）
-dsh plugin --profile desktop add file:D:\VibeCoding\scratch\dsh-sync-hub
+# 装进当前 profile（插件是组合包）
+dsh plugin --profile <profile> add file:D:\VibeCoding\scratch\dsh-sync-hub
 ```
 
-重启后打开 **设置 → 同步中心**。卸载：`dsh plugin --profile desktop remove dsh-sync-hub`。
+> `desktop` profile 由 Electron 独占管理，命令行装不进去（会报
+> `profile "desktop" is managed exclusively by the Electron application`）。
+> 桌面版请用 **设置 → 插件 → 导入本地插件**（或插件管理器的 install_bundle），
+> 装完**重启 DSH** 才会加载；之后用「卸载 → 重新安装」即可热更新到新代码。
+
+装好后有两个入口：左侧导航的 **同步中心**（日常同步台）和 **设置 → 同步中心**（配置中心）。
+卸载：在插件管理器里移除 `dsh-sync-hub`。
 
 没有运行时依赖（只用 `node:*` 内置模块），因此不会往 profile 里引入任何第三方包。
 
@@ -120,7 +126,7 @@ blobs/ab/abcdef...                    # 内容寻址的 blob，按 sha 前两位
 - **同步范围**：七个范围的开关与逐条说明、会话体积/天数限制、自定义路径。
 - **传输通道**：三种通道三选一、参数、令牌、连接检查清单。
 
-## 六、给 Agent 用的工具
+## 七、给 Agent 用的工具
 
 | 工具 | 作用 |
 | --- | --- |
@@ -132,7 +138,7 @@ blobs/ab/abcdef...                    # 内容寻址的 blob，按 sha 前两位
 HTTP 接口（前缀 `/dsh-sync-hub`）：`GET /state`、`GET /status?remote=1`、`GET /analysis`、
 `GET /sessions`、`GET /backups`、`POST /settings`、`POST /secret`、`POST /test`、`POST /plan`、`POST /run`。
 
-## 七、不做的事（边界）
+## 八、不做的事（边界）
 
 - **不同步浏览器端设置**：主题、快捷键、侧边栏布局存在浏览器 localStorage 里，插件无法跨机搬运。
 - **不自动装插件**：插件清单只上报差异，装不装由你决定。
@@ -141,7 +147,7 @@ HTTP 接口（前缀 `/dsh-sync-hub`）：`GET /state`、`GET /status?remote=1`�
   搬运登录状态时，在「同步范围」里手动打开凭据开关（私钥类文件任何时候都不传）。
 - **会话引用的附件暂时不跟随**（`/attachments/` 引用）；后续版本计划作为可选范围加入。
 
-## 八、开发
+## 九、开发
 
 ```bash
 node tests/smoke.mjs           # 无宿主冒烟：采集 → 推送 → 二次计划 → 伪造远端会话可拉取
