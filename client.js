@@ -150,6 +150,7 @@ window.__ModuleLoader__.load({
       checkFail: '有问题',
 
       analysisTitle: '这台机器现在怎么样',
+      analysisCard: '本机现状',
       analysisIntro: '读一遍本机的 DSH 数据分布，只看体量与清单，不改任何文件。',
       analysisRun: '分析本机',
       analysisLoading: '分析中…',
@@ -290,6 +291,7 @@ window.__ModuleLoader__.load({
       checkFail: 'Problems found',
 
       analysisTitle: 'How this machine looks',
+      analysisCard: 'Local machine',
       analysisIntro: 'Reads the local DSH data layout — size and inventory only, nothing is modified.',
       analysisRun: 'Analyze this machine',
       analysisLoading: 'Analyzing…',
@@ -1228,7 +1230,7 @@ window.__ModuleLoader__.load({
         h(
           Card,
           {
-            title: t('analysisTitle'),
+            title: t('analysisCard'),
             extra: h(Badge, { text: `${status.local?.entries || 0} ${t('entries')}` }),
           },
           h(Collapsible, {
