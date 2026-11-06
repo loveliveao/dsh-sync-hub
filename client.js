@@ -94,6 +94,7 @@ window.__ModuleLoader__.load({
       secretsOn: '会连下面这些文件一起上传（明文）：',
       secretsNever: '私钥类文件（.pem / .p12 / .pfx / *.key / id_rsa 等）无论开关怎么开都不会同步。',
       secretsBoth: '另一台电脑也要打开这个开关，它才会把这些文件写回去。',
+      secretsPublicRepo: 'Git 通道：如果远端仓库是公开的（不用登录就能访问），开启此开关后同步会被直接拦住，避免明文密钥被所有人看到。请先把仓库改成私有。',
       sessionsLimit: '会话限制',
       maxBytes: '单会话上限',
       maxBytesHint: '超过这个大小的会话不上传。填 0 表示不限制。',
@@ -233,6 +234,7 @@ window.__ModuleLoader__.load({
       secretsOn: 'These files are uploaded too (plain text):',
       secretsNever: 'Private key files (.pem / .p12 / .pfx / *.key / id_rsa …) are never synced, whatever the switch says.',
       secretsBoth: 'The other computer must enable the same switch to write these files.',
+      secretsPublicRepo: 'Git channel: if the remote repo is public (readable without logging in), syncing is blocked while this switch is on, so plain-text keys are never exposed. Make the repo private first.',
       sessionsLimit: 'Session limits',
       maxBytes: 'Max size per session',
       maxBytesHint: 'Sessions bigger than this are skipped. 0 means no limit.',
@@ -552,10 +554,14 @@ window.__ModuleLoader__.load({
           if (!res.ok && res.error) throw new Error(res.error);
           const result = res.result || {};
           const totals = `↑${(result.pushed || []).length} ↓${(result.pulled || []).length} ⚠${(result.conflicts || []).length}`;
+          const failures = result.failures || [];
+          const firstMessage = failures.length ? String(failures[0].message || '') : '';
           store.set({
             notice: {
-              kind: (result.failures || []).length ? 'warn' : 'ok',
-              text: `同步完成 ${totals}${(result.failures || []).length ? ` · ${result.failures.length} 项失败` : ''}`,
+              kind: failures.length ? (result.blocked ? 'error' : 'warn') : 'ok',
+              text: failures.length
+                ? (result.blocked ? `同步被阻止：${firstMessage}` : `同步完成 ${totals} · ${failures.length} 项失败：${firstMessage}`)
+                : `同步完成 ${totals}`,
             },
             plan: null,
           });
@@ -1015,7 +1021,7 @@ window.__ModuleLoader__.load({
             h('div', { style: { fontSize: 11, color: C.dim } }, t('subtitle')),
           ),
           ver ? h(Badge, { text: `DSH ${ver}` }) : null,
-          status ? h(Badge, { text: `${t('device')}: ${status.device.name}` }) : null,
+          status ? h(Badge, { text: `${t('device')}: ${status.device?.name || '—'}` }) : null,
           h(Button, { onClick: () => hub.actions.load({ probeRemote: true }), busy: hub.loading }, t('refresh')),
         ),
 
@@ -1161,11 +1167,34 @@ window.__ModuleLoader__.load({
           ),
         );
       const totals = plan && plan.totals;
-      if (!totals) return h(Empty, null, t('planEmpty'));
-      if (totals.push + totals.pull + totals.conflicts === 0) return h(Empty, null, t('nothing'));
+      const guard = plan && plan.guard;
+      const guardBanner =
+        guard && guard.ok === false
+          ? h(
+              'div',
+              {
+                style: {
+                  marginBottom: 8,
+                  padding: '8px 10px',
+                  borderRadius: 10,
+                  border: `1px solid ${C.bad}`,
+                  background: C.fill,
+                  fontSize: 12,
+                  color: C.bad,
+                  lineHeight: 1.55,
+                },
+              },
+              guard.message,
+            )
+          : null;
+      if (!totals) return h('div', null, guardBanner, h(Empty, null, t('planEmpty')));
+      if (totals.push + totals.pull + totals.conflicts === 0) {
+        return h('div', null, guardBanner, h(Empty, null, t('nothing')));
+      }
       return h(
         'div',
         null,
+        guardBanner,
         h(
           'div',
           { style: { display: 'flex', gap: 8, marginBottom: 6, flexWrap: 'wrap' } },
@@ -1340,6 +1369,9 @@ window.__ModuleLoader__.load({
                         : null,
                       h('div', { style: { marginTop: 3 } }, t('secretsNever')),
                       h('div', null, t('secretsBoth')),
+                      secretsOn && (status.transport || 'local') === 'git'
+                        ? h('div', { style: { marginTop: 3, color: C.warn } }, t('secretsPublicRepo'))
+                        : null,
                     )
                   : null,
               ),
@@ -1659,7 +1691,7 @@ window.__ModuleLoader__.load({
             h('div', { style: { fontSize: 11, color: C.dim } }, t('subtitle')),
           ),
           ver ? h(Badge, { text: `DSH ${ver}` }) : null,
-          status ? h(Badge, { text: `${t('device')}: ${status.device.name}` }) : null,
+          status ? h(Badge, { text: `${t('device')}: ${status.device?.name || '—'}` }) : null,
           h(Button, { onClick: () => hub.actions.load({ probeRemote: true }), busy: hub.loading }, t('refresh')),
         ),
         hub.notice

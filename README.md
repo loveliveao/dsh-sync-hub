@@ -68,6 +68,11 @@ dsh plugin --profile <profile> add file:D:\VibeCoding\scratch\dsh-sync-hub
 无论开关怎么开，以下内容**永远不同步**：私钥类文件（`*.pem` / `*.p12` / `*.pfx` / `*.key` /
 `id_rsa` / `id_ed25519` / `id_ecdsa` / `id_dsa`）、`.env*`、`.netrc`、以及插件自己的 `~/.dsh/sync-hub/`。
 
+**公开仓库闸门**：用 Git 通道时，如果远端仓库「不用登录就能读」（也就是公开仓），
+而你又打开了「凭据与密钥」，同步会被**直接拦住**，并在计划页写明原因。
+公开仓 + 明文 key 等于把 key 发给所有人，所以这里不给「先推了再说」的选项。
+处理办法：把仓库改成私有，或者先关掉凭据开关。
+
 ### 始终排除的清单
 
 `.credentials.yaml*`、`auth|oauth|token|secrets.json`、`.env*`、`.netrc`、私钥文件
@@ -79,6 +84,8 @@ dsh plugin --profile <profile> add file:D:\VibeCoding\scratch\dsh-sync-hub
    三台机器填**同一个目录**（各自本机路径可以不同，指向同一份云端同步内容即可）。
 2. **Git 仓库** —— 任意私有仓（GitHub / Gitee / 自建）。有历史、天然支持多机合并。
    私有仓的令牌存在 DSH 凭据库里，**不写进 `.git/config`**，也不回传界面。
+   令牌也不进 git 的命令行参数（命令行在进程列表里全机可见）：认证头通过
+   `GIT_CONFIG_*` 环境变量注入，只给这一个子进程。
 3. **WebDAV** —— 坚果云、Nextcloud、群晖等。填服务器地址 + 用户名 + 密码。
 
 目标目录的布局：
@@ -153,6 +160,7 @@ HTTP 接口（前缀 `/dsh-sync-hub`）：`GET /state`、`GET /status?remote=1`�
 node tests/smoke.mjs           # 无宿主冒烟：采集 → 推送 → 二次计划 → 伪造远端会话可拉取
 node tests/secrets.test.mjs    # 凭据开关：关闭时不上传，打开时只放行那 3 个已知文件
 node tests/transport.test.mjs  # 三种通道的检查步骤与「不泄漏令牌」
+node tests/git-guard.test.mjs  # Git 安全：令牌走环境变量、公开仓库闸门
 node --test tests/analysis.test.mjs   # 本机盘点：坏文件不抛异常、3 秒内返回
 ```
 
