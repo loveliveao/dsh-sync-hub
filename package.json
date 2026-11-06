@@ -1,0 +1,54 @@
+{
+  "name": "dsh-sync-hub",
+  "version": "0.1.0",
+  "description": "同步多台电脑上的 DSH 配置与会话：可选的同步范围、三种传输通道、冲突检测与回滚。",
+  "private": true,
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./icon": "./icon.svg",
+    "./locale/*.json": "./locale/*.json",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "icon.svg",
+    "cordis.patch.yml",
+    "lib",
+    "!lib/**/*.test.mjs",
+    "locale",
+    "README.md",
+    "docs",
+    "tests/smoke.mjs"
+  ],
+  "engines": {
+    "dsh": ">=0.2.1-rc.5",
+    "node": ">=20"
+  },
+  "dependencies": {},
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "inject": [
+        "@deepseek-ai/dsh-client-runtime",
+        "@deepseek-ai/dsh-client-connection",
+        "@deepseek-ai/dsh-client-ui-settings"
+      ],
+      "platform": "web"
+    }
+  },
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "sync",
+    "backup",
+    "sessions"
+  ],
+  "license": "MIT",
+  "icon": "./icon.svg"
+}

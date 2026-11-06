@@ -1,0 +1,9 @@
+{
+  "meta": {
+    "title": "Sync Hub",
+    "description": "Sync DSH config and sessions across machines, without any credentials"
+  },
+  "section": "Sync Hub",
+  "title": "Sync Hub",
+  "subtitle": "Sync DSH config and sessions across machines · no credentials"
+}

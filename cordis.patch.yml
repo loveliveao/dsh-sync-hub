@@ -1,0 +1,33 @@
+# dsh-sync-hub bundle patch：把本插件插入 profile 的层级栈。
+#
+# 这里的 config 只是「首次安装时的初始值」：插件第一次加载会把它播种到
+# $DSH_HOME/sync-hub/state.json，之后在「设置 → 同步中心」里改动的内容以界面
+# 为准，不会被本文件的默认值覆盖。
+- insert:
+    - id: dsh-sync-hub
+      name: 'dsh-sync-hub'
+      config:
+        # 本机显示名；留空则用 hostname。
+        deviceName: ''
+        # 通道：local（本地/网盘同步文件夹）、git（任意 Git 远端）、webdav（WebDAV 服务器）。
+        transport: local
+        remote:
+          # local: 同步文件夹路径。git: 仓库地址 + 分支。webdav: 服务器地址。
+          path: ''
+          repo: ''
+          branch: main
+          url: ''
+          username: ''
+        sections:
+          cordis: true
+          plugins: true
+          skills: true
+          sessions: true
+          workspaces: false
+          pluginData: false
+        sessions:
+          maxBytes: 33554432
+          maxAgeDays: 0
+          excludeIds: []
+        conflictPolicy: newest
+        keepBackups: 20
