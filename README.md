@@ -28,7 +28,7 @@
 
 ```bash
 # 装进当前 profile（插件是组合包）
-dsh plugin --profile <profile> add file:D:\VibeCoding\scratch\dsh-sync-hub
+dsh plugin --profile <profile> add file:D:\dsh-sync-hub
 ```
 
 > `desktop` profile 由 Electron 独占管理，命令行装不进去（会报

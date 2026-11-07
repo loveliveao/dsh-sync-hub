@@ -1,0 +1,145 @@
+# 工作区巡检报告 — dsh-sync-hub v0.4.0
+
+日期：2026-11-07 · 范围：D:\dsh-sync-hub（DSH 插件源码） + 本机活实例（C:\Users\HUAWEI\.dsh）
+方式：3 个只读审查队友（隐私 / 引擎 / 前端）+ Lead 亲自复现验证。**全程未修改仓库任何文件。**
+
+标注：✅ = Lead 已在本机 import 真实模块 / 实测复现；📄 = 代码审查判定（未实机复现）
+
+---
+
+## 一、结论先行
+
+插件**能跑通**（测试全绿、HTTP 接口全 200、活实例已加载 v0.4.0），但存在 **3 个会导致真实数据损坏 / 泄露的 P0**，而且当前**从未真正执行过一次同步**（remote.path 为空），所以这些缺陷都还没被触发过。
+
+| 级别 | 数量 | 代表问题 |
+|---|---|---|
+| P0 | 3 | 同步接口零鉴权（跨站可外泄数据）、ignoreAfterPull 被丢导致每次同步重复覆写、custom 分区拉取会抹掉用户真实值 |
+| P1 | 8 | 全大写密钥不脱敏、键名锚定导致十余种密钥名漏网、脱敏吞尾逗号损坏 JSON、profile 穿越、备份契约不匹配、备份无回滚入口、冲突判定依赖跨机时钟、同步无事务 |
+| P2 | 14 | 敏感文件清单不完备、开关口径不一致、远端可植入凭据、路径注入、busy 单槽可重复触发同步 … |
+| P3 | 11 | tmp 文件可预测、采集无字节上限、Windows 大小写敏感、每键全树重渲染 … |
+
+**另有 5 项仓库 / 部署卫生问题**（见第五节）：依赖路径指向已删除目录、README 安装命令仍是旧路径、旧沙箱 profile 残留、无 git remote / 无 CI、README 测试清单不全。
+
+---
+
+## 二、P0（必须先修）
+
+### P0-1 ✅ 同步接口零鉴权 + 无 Origin 校验 → 跨站可把 DSH 数据推给攻击者
+- 位置：`lib/server.mjs:32-97`（全部路由）、`lib/server.mjs:14-30`（readBody 不校验 Content-Type）、`index.js`（`ctx.webServer.register({kind:'prefix', path:'/dsh-sync-hub'})`）
+- 依据：DSH 宿主只为 **/api 路由与 stream** 提供 Origin / 会话校验；本插件注册的是普通 `prefix` 路由，**不在保护范围内**。全仓 grep `origin|referer|sec-fetch|authorization|csrf` 零命中。
+- 攻击链：任意网页 → `POST /dsh-sync-hub/settings`，body 用 `content-type: text/plain`（CORS 简单请求，**免预检**）→ 服务端无条件 `JSON.parse` → 把 transport 改成 git 并指向攻击者仓库、打开 secrets 开关 → `POST /run` 把 DSH_HOME 推走 → `POST /secret` 顶掉已存 token。
+- 附带：`lib/server.mjs:66` 的 `body.settings || body` 兜底让裸 body 覆盖顶层设置，是这条链能生效的关键一环。
+- 修法：① 校验 `Origin` / `Sec-Fetch-Site` 同源；② POST 只接受 `application/json`（跨站被迫预检，服务端不发 CORS 头即失败）；③ 加一次性 token 走自定义头；④ 复用宿主 `ctx.connection.requestRejection()`。
+
+### P0-2 ✅ ignoreAfterPull 被状态白名单丢弃 → 每次同步都重复拉取 / 合并 / 覆写 / 备份
+- 位置：`lib/state.mjs:164-182`（normalizeState 白名单）、`lib/state.mjs:58-73`（defaultState）、`lib/state.mjs:193-200`（saveState）；写入方 `lib/engine.mjs:390/445`，消费方 `lib/engine.mjs:97/128-132`
+- 实测：`normalizeState({ignoreAfterPull:{...}})` → `undefined`；磁盘上永远没有该字段 → 补丁是死代码。
+- 叠加基线漂移（`lib/engine.mjs:411` 记本地 `canonicalSha` 而非远端 `entry.sha`），每轮必定重判 `'pull'`：同一文件反复拉取、反复覆写、每次新建一个备份目录。
+- 修法：normalizeState 补 `ignoreAfterPull: asObject(input.ignoreAfterPull)`、defaultState 补 `{}`；同时 `base[id] = entry.sha`（远端基线），本地 sha 另存 `state.localSha`。
+
+### P0-3 ✅ custom 分区拉取会抹掉用户真实值
+- 位置：`lib/sections.mjs:409-411`（对 .yml/.json/.env/.ini/.toml 做 redactText 但 `meta=null`，见 `bufEntry` `sections.mjs:136`）、`SECTION_DEFS`（`lib/sections.mjs:30-101`）无 custom 项 → `lib/engine.mjs:270` kind 落 files → `lib/engine.mjs:280-289` 把**含 <redacted> 的 blob 原子写回用户文件**
+- 修法：collectCustom 传 `meta:{kind:'redacted'}` 并给 SECTION_DEFS 补 custom（与 cordis 同走合并路径）。
+
+---
+
+## 三、P1（高，已实测复现为主）
+
+### 隐私 / 脱敏
+1. ✅ **全大写值被当环境变量引用**（`lib/privacy.mjs:40,91-101`）→ `api_key: AKIAIOSFODNN7EXAMPLE` 原样上传。
+2. ✅ **键名 ^...$ 锚定**（`lib/privacy.mjs:38,125`）→ `aws_secret_access_key`、`aws_access_key_id`、`auth_token`、`passphrase`、`api_secret`、`openai_api_key`、`ssh_key`、`jwt`、`bearer` 全部不脱敏；`apiToken` 亦漏。
+3. ✅ **短于 8 字符不脱敏**（`lib/privacy.mjs:98`）→ `password: abc123` 原样。
+4. ✅ **块标量 / 流式 YAML / 单行与嵌套 JSON 整段漏脱敏**（`lib/privacy.mjs:122` + `lib/sections.mjs:410,24`）→ 已导入的 `redactJson` 从未调用，是死导入。
+5. ✅ **脱敏吞掉 JSON 尾逗号**（`lib/privacy.mjs:99-100,122`）→ 3 行 JSON 输入输出变成 `"api_key": "<redacted>"`（逗号消失）→ 对端 `JSON.parse` 报 `Expected ',' or '}' after property value`，**配置语法被写坏**。
+6. ✅ **profile 名未校验**（`lib/paths.mjs:39-63` + `lib/sections.mjs:175-176,199`）→ `DSH_PROFILE=..\..\Windows` 时读到 `C:\Users\HUAWEI\Windows\cordis.patch.yml`（DSH_HOME 之外）并上传。实测确认。
+7. 📄 **链接 / 联接逃逸**（`lib/util.mjs:50-55,62-95` + `lib/paths.mjs:93-100`）→ 采集侧不解析 realpath、不挡 Windows Junction；pull 侧落盘只做字面前缀检查 → 远端可写到 DSH_HOME 之外（`lib/engine.mjs:261-266,288-289`）。**Windows 联接行为未实机复现**（只读约束）。
+
+### 同步正确性
+8. ✅ **备份契约不匹配**（服务端 `lib/engine.mjs:522-530` 返回**目录名字符串数组** → `lib/hub.mjs:165` 透传 → 前端 `client.js:1582-1589` 按对象读 `b.stamp/b.name/b.path`）→ 备份卡片显示空白行、`key={undefined}`、且「还没有备份」空态永不出现。首次成功同步后必然复现。
+9. 📄 **备份只进不出**：全仓无 restore / rollback 代码路径，用户被覆盖后**没有任何程序化回滚手段**。
+10. 📄 **备份保留按目录数计**（`lib/engine.mjs:218-242`）→ `keepBackups=20` 实为 20 个**文件**版本；一次批量 pull 即可挤掉全部历史；同毫秒两次备份落同一目录互相覆盖。
+11. 📄 **无事务**（`lib/engine.mjs:362-473` + `lib/hub.mjs:204-208`）→ 任一文件写失败即中断，本轮 base 更新全丢，下轮可能改判 conflict 并按 newest 覆盖本机改动。
+12. 📄 **冲突判定依赖跨机时钟**（`lib/engine.mjs:79-90`）→ mtime 不可用时兜底「bytes 大者胜」，用户小改动被大文件吃掉。
+13. 📄 **会话无合并**（`lib/engine.mjs:312-356`）→ 整份覆盖 + 删除别处同 id 副本，与 `lib/sections.mjs:65` 的文案「按会话合并，不会删除对方机器的会话」矛盾。
+
+### 接口层
+14. ✅ **前端不检查 HTTP 状态码**（`client.js:476/477-484` 丢弃 `Response.ok/status`，只信响应体 ok 字段）→ 宿主返回 HTML 时用户看到 `SyntaxError: Unexpected token '<'`；`/plan`、`/run` 无超时无取消。
+15. 📄 **路径注入**：`settings.remote.path` 与 `workspaces.map` 未做越界校验（`lib/state.mjs` normalizeSettings 原样保留）→ 同步目标可被指向任意目录。对比：`customPaths[].rel` 已被正确拦截，说明是漏改不是没设计。
+
+---
+
+## 四、P2 / P3 摘要
+
+**P2（14 项）**
+- 敏感文件默认排除清单不完备（`lib/privacy.mjs:16-36`）：漏 `.git-credentials`、`.npmrc`、`.pgpass`、`.my.cnf`、`.htpasswd`、`.envrc`、`*.ppk`、`*.jks`、`*.asc`、`credential.yml`、`secrets.yaml`、`my-secrets.json`；私钥仅按文件名判定，**无内容嗅探**。
+- 「凭据与密钥」开关口径不一致：采集端 `lib/sections.mjs:155` 调 `isForbiddenRel(rel)` 未传 `allowSecrets`，引擎端 `lib/engine.mjs:158,262,333` 已放行 → 开关打开也没同步走。
+- 开关打开后 **pull 侧远端可向本机植入凭据文件**（`lib/engine.mjs:261-262,332-333`）→ 凭据注入 / 投毒。
+- `DSH_HOME=C:\` 时 `resolveInsideHome` 前缀检查失效（`lib/paths.mjs:93-100`）。
+- sessions 默认开启且零脱敏（`lib/state.mjs:33`）→ 聊天里粘贴过的密钥原样上传；文档承诺的「预览里标记密钥」未实现；`maskSecretString` 是无调用点死代码。
+- `redactJson` 对共享子对象返回原节点（`lib/privacy.mjs:136-141`）→ 别名子树绕过。
+- `buildKeyMap` 纯键名全局匹配（`lib/sections.mjs:528-562`）→ 同名键取错本机值。
+- 跨进程无锁（`lib/hub.mjs:19-31` 只在进程内串行，`lib/state.mjs:184-200` 是 read-modify-write）。
+- `transport/local.mjs:64-73` putFile 先 `rm` 再 writeFile（非原子且先删旧件）。
+- `transport/git.mjs:212-235` non-fast-forward 文案称「本次改动未丢失」，但 `:182-194` 的 `reset --hard` + `clean -fdx` 下次会丢弃该提交——文案与行为相反。
+- manifest 每 id 只存一条（`lib/engine.mjs:398`）→ 双机并发改同一文件无法追溯双方 sha。
+- `lib/hub.mjs:224` 用 `id.split('/')` 取 sessionId，但 id 形如 `sessions:<id>` → `synced` 恒 false。
+- 关闭的 section 整段跳过且不更新基线（`lib/engine.mjs:123`）→ 日后启用产生假冲突。
+
+**P3（11 项）**
+`util.mjs:16-27` tmp 名可预测且未用 `wx`（且无 fsync、tmp 落在被扫描目录内，下次可能被当正常文件同步出去）；采集无字节上限（`util.mjs:62-95`、`sections.mjs:156`）；`toHomeRel` Windows 大小写敏感会静默漏同步（`paths.mjs:103-108`）；`listSessions` 未忽略 node_modules（`sections.mjs:495`）；子进程继承完整环境（`util.mjs:97-120`）；`SECRET_FILES` 硬编码；前端每键全树重渲染（`client.js:707-714`，无 memo / useMemo）；服务端每次请求重扫全盘重算会话哈希（`sections.mjs:491-521`）；会话静默截断 300 条却按全量展示；`api()` 依赖 `document.baseURI`（子路径部署 / Electron 下打错地址）。
+
+**XSS 专项：未发现。** 全仓 `dangerouslySetInnerHTML|innerHTML|outerHTML|document.write|eval(|new Function` 零命中，所有插值走 React 文本子节点自动转义。唯一残留是内部错误原文回传（`lib/server.mjs:91-94`）造成的信息泄露（非 XSS）。
+
+---
+
+## 五、仓库 / 部署卫生问题
+
+1. ~~**依赖路径指向已删除目录**~~ —— ✅ **已于 2026-11-07 修复**
+   - 原状：`C:\Users\HUAWEI\.dsh\profiles\desktop\package.json` 与 `pnpm-lock.yaml` 里 `dsh-sync-hub` 依赖是 `file:D:/VibeCoding/scratch/dsh-sync-hub`，该目录**已不存在**（项目已搬到 `D:\dsh-sync-hub`）；后果是 `pnpm install` 指向死路径、**源码改动不会自动进已装副本**。
+   - 现状：desktop profile 的 `local-plugins\dsh-sync-hub` 与 `node_modules\dsh-sync-hub` 都改成 **Windows Junction → `D:\dsh-sync-hub`**；dependencies 改为 `file:local-plugins/dsh-sync-hub`；`pnpm-lock.yaml` 5 处死路径同步改写（残留 0）。源码改完即时进已装副本。
+   - 回滚备份：`C:\Users\HUAWEI\.dsh\plugin-backups\20261107\`（package.json / pnpm-lock.yaml / cordis.patch.yml / cordis.yml / 旧已装副本全量）。
+2. ~~**文档滞后**~~ —— ✅ **已修复**：`README.md:31` 与 `docs/research/00-brief.md:20` 的旧路径已改为 `D:\dsh-sync-hub`。
+3. ~~**遗留沙箱 profile**~~ —— ✅ **已修复**：`~/.dsh/profiles/sb-sync-hub` 的 dependencies 与 `pnpm-lock.yaml` 同样改为 `file:local-plugins/dsh-sync-hub`，其 `node_modules\dsh-sync-hub`（原为指向已删目录的死 Junction）改为指向 `D:\dsh-sync-hub` 的 Junction，启动时 `patch: entry "sync-hub" not found` 告警随之消失。
+4. **发布准备未完成**：无 git remote、无 tag、无 `.github/`（无 CI）。
+5. **README 测试清单不全**：「九、开发」只列 5 个测试文件，漏 `session-canon.test.mjs` 与 `cross-machine.test.mjs`。
+
+### 5.1 部署布局（2026-11-07 起）
+
+```
+<profile>/
+├─ local-plugins/dsh-sync-hub   → Junction → D:\dsh-sync-hub   （插件本体，hmr 监听此目录）
+├─ node_modules/dsh-sync-hub     → Junction → D:\dsh-sync-hub   （宿主解析入口）
+└─ cordis.patch.yml              → hmr 条目：base=ctx.get("profileContext").dir, root=[local-plugins]
+```
+
+- profile `package.json` / `pnpm-lock.yaml`：`"dsh-sync-hub": "file:local-plugins/dsh-sync-hub"`。
+- **需要重启 DSH 一次**才能让 hmr 建立 watcher（改动 hmr 条目时运行实例已启动）；重启后改工作区源码即自动热重载。
+- 坑：**不要再对工作区跑 `sync_plugin` write=true**——会把文件拷进 junction 目标（写脏仓库），并把 junction 变成真实目录。
+- 插件 HTTP 路由带前缀：`/dsh-sync-hub`（`lib/server.mjs:2` 的 `PREFIX`），探测 `/state` 会 404，属正常。
+
+---
+
+## 六、活实例现状
+
+- 插件 0.4.0 / DSH 0.2.2-rc.1（desktop profile）/ node 24.21.0 / 设备 `HUAWEI(28cd59f9)` / `DSH_HOME=C:\Users\HUAWEI\.dsh`
+- webServer 仅监听 `127.0.0.1:1900`（局域网不可达，这点是好的）
+- 通道 `local`，但 `remote.path` 为空 → **从未执行过一次同步**（`base={}`、`lastPlan=null`、`lastSync=null`）
+- 本机 56 条目 / 37MB：cordis 2、plugins 1、skills 1、sessions 52（另 55 个会话共 36.9MB）
+- `~/.dsh/sync-hub/` 下只有 `state.json`(892B)，无 `backups/`、无 `remote-git/`
+- `sync_hub_run` 已注册为全局 Agent 工具（`lib/tools.mjs:113-147`，`isConcurrencySafe:false`，timeout 600s）—— 修鉴权时别忘了它同样走 HTTP 接口
+- `sync_plugin` 工具坑：对本仓库 dryRun 时 target 会解析成 `...\local-plugins\dsh-useful-tools`（用了工具默认 pluginName），必须显式传 `pluginName:'dsh-sync-hub'`
+
+---
+
+## 七、建议修复顺序
+
+1. **P0-1**（鉴权 / Origin / Content-Type）→ 唯一可被外部触发的攻击面，优先级最高
+2. **P0-2 + 基线漂移**（一起改，否则 ignore 是空转）→ 消除「每次同步重复覆写 + 重复备份」
+3. **P0-3 + 会话覆盖** → 消除数据损坏路径
+4. **P1 脱敏组**（大写值 / 键名 / 短值 / JSON-YAML 结构化 / 尾逗号）→ 一组一起改并补回归用例
+5. **P1 备份组**（契约统一 + 回滚入口 + 保留策略按批次目录）
+6. **profile 名白名单 + realpath 校验**（含 Junction 判定）
+7. **敏感文件清单补齐 + 内容嗅探 + 开关口径对齐 + pull 侧禁止凭空创建凭据文件**
+8. P2 / P3 按需
+
+**回归用例建议覆盖**：链接逃逸、全大写密钥、`aws_*` 键名、块标量、单行 JSON、尾逗号、profile 穿越、备份契约往返、重复同步幂等（连跑两次 pulled 应为 0）。

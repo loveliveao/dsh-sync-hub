@@ -17,7 +17,7 @@
 ## 硬约束
 
 1. 必须能在当前桌面版 DSH 上加载：desktop 0.2.2-rc.1（runtime node 24.21.0 / pnpm 11.28.5），profile `desktop`。
-2. 插件工程目录：`D:\VibeCoding\scratch\dsh-sync-hub`（独立 git 仓）。
+2. 插件工程目录：`D:\dsh-sync-hub`（独立 git 仓；2026-11-07 由 `D:\VibeCoding\scratch\dsh-sync-hub` 迁至此）。
 3. 尽量零运行时依赖：只用 Node 内置模块（fs/path/zlib/crypto/fetch/child_process）。不要引入 React 以外的重型依赖；client 端只用 DSH 客户端已有的运行时。
 4. **隐私红线**：凭据、token、API key、OAuth、`.credentials.yaml`、MCP env 密钥一律不进入同步包（默认排除 + 导出前脱敏）。用户明确要求「除隐私数据外」。
 5. 平台：Windows 优先，路径处理要跨平台（插件也要能跑在 macOS 上）。
