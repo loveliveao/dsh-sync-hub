@@ -266,7 +266,7 @@ HTTP 接口（前缀 `/dsh-sync-hub`）：`GET /state`、`GET /status?remote=1`�
 ## 九、开发
 
 ```bash
-npm test                     # 一次跑完 18 个测试文件
+npm test                     # 一次跑完 19 个测试文件
 node tests/smoke.mjs           # 无宿主冒烟：采集 → 推送 → 二次计划 → 伪造远端会话可拉取
 node tests/secrets.test.mjs    # 凭据开关：关闭时不上传，打开时只放行那 3 个已知文件
 node tests/transport.test.mjs  # 三种通道的检查步骤与「不泄漏令牌」
@@ -286,6 +286,7 @@ node tests/section-model.test.mjs  # 分区模型：custom 的开关、记账与
 node tests/custom-section.test.mjs  # 自定义路径分区：脱敏副本合并、不写占位文件
 node tests/state-baseline.test.mjs  # 状态基线：白名单往返与 sha 记账
 node tests/merge-correctness.test.mjs  # 合并正确性：结构化 JSON 合并、保留本机独有键、三方基线比较
+node tests/path-safety.test.mjs    # 路径安全：联接外不读不写、设置路径净化、子路径净化
 ```
 
 目录：
