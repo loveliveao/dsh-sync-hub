@@ -1,6 +1,6 @@
 {
   "name": "dsh-sync-hub",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "同步多台电脑上的 DSH 配置与会话：可选的同步范围、三种传输通道、冲突检测与回滚。",
   "private": true,
   "type": "module",
@@ -26,7 +26,9 @@
     "tests/secrets.test.mjs",
     "tests/transport.test.mjs",
     "tests/git-guard.test.mjs",
-    "tests/analysis.test.mjs"
+    "tests/analysis.test.mjs",
+    "tests/session-canon.test.mjs",
+    "tests/cross-machine.test.mjs"
   ],
   "engines": {
     "dsh": ">=0.2.1-rc.5",
