@@ -269,3 +269,41 @@
   - `tests/section-model.test.mjs`（26 项断言）：`customEnabled` 单元、custom 不依赖 `settings.sections.custom`、设备记录含 custom、快照 custom 行 enabled 跟随 customPaths、push 后 `state.base` / `state.localSha` 都等于远端 sha、**开了密钥同步的 cordis 明文条目按整文件落地**（用「A 的文件里字面写 `<redacted>`」区分合并路径与整文件路径）。
   - `tests/custom-section.test.mjs`：自定义路径分区的脱敏副本合并、不写占位文件、老 manifest（无 meta）也要挡住。
   - `tests/state-baseline.test.mjs`：状态基线与白名单往返。
+
+---
+
+## 十、P1 同步正确性批次：合并 / 基线 / 脱敏语法（2026-11-07 17:05，全部实测）
+
+这一批修的是 **P0 修复过程中暴露出来的合并与基线缺陷**，不在第三节清单里，但都属于「同步正确性」：远端存的是脱敏副本，两台机器一合并就容易把用户的真实配置改坏。
+
+### 10.1 合并层重写：从「按行拼」到「结构化合并」（`lib/sections.mjs`）
+
+- **老行为**：`mergeRedactedText` 逐行处理 —— 远端文本作骨架，含 `<redacted>` 的行用本机同名键回填，本机没有该键就整行丢掉。三个问题：
+  1. 本机**独有的键**会被整体丢弃（用户自己加的配置项在拉取后消失）；
+  2. **JSON 按行合并会产出非法 JSON**（行尾逗号/引号被拼错，对端 `JSON.parse` 直接报错）；
+  3. 嵌套结构（对象里的对象）无法按行安全回填。
+- **新行为**：入口 `mergeRedactedText` 先判断两侧能否解析成 JSON 对象 →
+  - `mergeRedactedJson` / `mergeJsonForPull`：**远端骨架 + 本机真值回填 + 本机独有键保留**（对象递归）；合并结果与本机一致时**原样返回本机文本**（不重排格式、不动用户排版）。
+  - `mergeRedactedLines`：仍是文本兜底，但补上「**本机独有的顶层键保留**」（缩进行不补，避免破坏嵌套结构）。
+- **推送方向另有一套**：新增 `mergeRedactedForPush`（本机为准 + **远端多出来的键保留**）—— 推之前先跟远端并集，否则整份盖掉会把远端多出来的配置抹掉。
+- 共享键的取值只能有一个赢家：**拉取时远端赢、推送时本机赢** → 拉过之后本机再改共享键再推，不会来回翻转。
+
+### 10.2 脱敏吞掉 JSON 尾逗号 → 远端存的「脱敏副本」根本不是合法 JSON（`lib/privacy.mjs`）
+
+- `redactValue` 原来把整行值连同行尾标点一起替换，**JSON 的逗号被吃掉**：
+  `{"apiKey": "sk-xxx", "model": "alpha"}` → `{"apiKey": "<redacted>"` → **非法 JSON**。
+- 后果很隐蔽：远端副本不是合法 JSON → 结构化合并自动失效 → 退化成按行合并 → 本机独有的键被丢（10.1 的问题被放大）。
+- 修复：先剥离行尾标点（`,` `;` `}` `]`），值本身替换后再把标点原样接回去；复合值（`{`/`[` 开头）整体替换。实测 `redactText` 对 JSON 产出**仍合法**的 JSON，YAML 行为不变。
+
+### 10.3 基线从「一个数」到「三方比较」，跳过不记基线（`lib/engine.mjs`）
+
+- `decide(local, remote, baseSha, localSha)` 改成三方比较：本机 sha == 远端 sha → same；否则 `localChanged = localSha != local.sha`、`remoteChanged = baseSha != remote.sha` → 都没动 same / 只远端动 pull / 只本机动 push / 两边都动 conflict。**老状态（只有 base 没有 localSha）自动退回老逻辑**，不会因为升级而改判历史条目。
+- 拉取时若「本机没有这个文件、远端是脱敏副本」→ **不记 base**（原来记了 = 宣称「远端这一版已同步过」；用户之后自己建了这个文件会被判成「本地已删除」，然后把远端的脱敏副本静默盖回去）。
+- 推送合并后 `state.base[id]` 记**远端那一版的 sha**、`state.localSha[id]` 记**本机这一版的 sha**（两者可能不同：并集推送时远端是并集）。
+- push / pull 的 sha 记账全部 try/catch 包住，记账失败只记 note，不掀翻整轮同步。
+
+### 10.4 验证（实测）
+
+- 新增 `tests/merge-correctness.test.mjs`（**54 项断言**）：合并函数单元 21 项（JSON 合法性、真值回填、远端键保留、本机独有键保留、无占位符、丢行计数、推送并集）+ 端到端 33 项（双机拉取合并、本机独有键没被抹掉、第二轮稳定不重复拉取、改共享键后并集推送、跳过的文件用户自建后报冲突、冲突解决后两边键都在）。
+- **全量 18 个测试文件逐个 `node` 直跑全部 exit=0**，`node --test "tests/*.test.mjs"` 整体 exit=0。
+- 已知取舍（写在这里免得以后当 bug 查）：拉取合并后本机会多出远端没有的键 → 本机 collected sha ≠ 远端 sha → 判 same → 不会反复推送；但**远端拿不到本机独有的键**，除非本机再改一次触发并集推送。
