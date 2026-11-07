@@ -6,13 +6,15 @@
 //   2. 主题 token 与小工具
 //   3. 数据层：全局 store（主面板与设置区共用一份状态）
 //   4. 基础组件：Button / Row / TextInput / Select / Switch / Badge / Card /
-////      Banner / Empty / Collapsible / Steps / SyncIcon
-//   5. 主面板（main 槽位）：日常同步台 —— 状态条 + 下一步引导 + 一键同步 + 范围快捷开关
-//   6. 配置中心（settings.section）：三页签 —— 概览 / 同步范围 / 传输通道
+//      Banner / Empty / Collapsible / Steps / SyncIcon
+//   5. 主面板（main 槽位）：概览仪表盘 —— KPI 条 + 同步状态 / 同步范围 /
+//      工作区 / 插件 / 会话 卡片
+//   6. 配置中心（settings.section）：四页签 —— 概览 / 同步范围 / 插件 / 传输通道
 //   7. 插件注册：main 槽位 + sidebar.panellist + settings.section
 //
 // 约定：样式只用主题 token（--dsw-alias-*），不写死颜色；不 import 任何
 //       Harness Client 包（组件抛错会让整个 slot 变成空白）；文案走 t()。
+
 window.__ModuleLoader__.load({
   id: 'dsh-sync-hub',
   factory(require) {
@@ -149,7 +151,7 @@ window.__ModuleLoader__.load({
       checkOk: '全部通过',
       checkFail: '有问题',
 
-      analysisTitle: '这台机器现在怎么样',
+      analysisTitle: '概览',
       analysisCard: '本机现状',
       analysisIntro: '读一遍本机的 DSH 数据分布，只看体量与清单，不改任何文件。',
       analysisRun: '分析本机',
@@ -166,7 +168,7 @@ window.__ModuleLoader__.load({
       analysisNoData: '没有数据',
       analysisErrors: '部分项目读取失败',
 
-      treeTitle: '这台机器现在怎么样',
+      treeTitle: '概览',
       treeCard: '本机现状',
       treeIntro: '按工作区列出本机的插件、技能与会话，展开可以看到每条会话会不会被同步。',
       treeRun: '读取本机清单',
@@ -182,6 +184,7 @@ window.__ModuleLoader__.load({
       treeUnassigned: '未归属工作区',
       treePlugins: '插件',
       treeSkills: '技能',
+      treeDsh: 'DSH 配置',
       wsOn: '同步这个工作区',
       wsOff: '不同步这个工作区',
       wsNoSessions: '这个工作区下还没有会话',
@@ -201,6 +204,76 @@ window.__ModuleLoader__.load({
       pushSync: '推送同步',
       wsScopeTitle: '按工作区分别同步',
       wsScopeHint: '关掉某个工作区，它的会话就不会被同步；插件、技能、配置不受影响。',
+
+      // —— 仪表盘 / 插件页（2026-11-07 重设计）——
+      dashTitle: '概览',
+      dashSubtitle: '这台机器的同步现状',
+      kpiSynced: '已同步条目',
+      kpiPending: '待同步',
+      kpiSessions: '会话',
+      kpiWorkspaces: '工作区',
+      kpiPlugins: '插件',
+      kpiSize: '占用空间',
+      cardStatus: '同步状态',
+      cardScope: '同步范围',
+      cardWorkspaces: '工作区',
+      cardPlugins: '插件',
+      cardSessions: '会话',
+      cardStatusHint: '传输方式、同步目标与上次同步结果。',
+      cardScopeHint: '按同步段的顺序列出，条目数是本机可同步的条数。',
+      cardWsHint: '每个工作区一行；有 git 仓库的可以自己推送。',
+      cardPluginHint: '每个插件一行；点开可以单独开关。',
+      cardSessionHint: '最近更新的会话。',
+      runNow: '立即同步',
+      viewPlan: '查看计划',
+      openScope: '打开同步范围',
+      openPlugins: '打开插件页',
+      pushed: '推送',
+      pulled: '拉取',
+      conflicts: '冲突',
+      switchOn: '开',
+      switchOff: '关',
+      gitRepo: 'git',
+      gitNone: '无 git',
+      gitRemote: '远端',
+      gitCanPush: '有 git 仓库，可自行推送。',
+      gitOnlyPlugin: '无 git 仓库，只能靠本插件同步。',
+      archived: '归档',
+      syncedCount: '已同步',
+      pendingCount: '待同步',
+      archivedCount: '归档',
+      sessionsCount: '会话',
+      pluginTab: '插件',
+      pluginGroupTitle: '插件配置',
+      pluginTotalSwitch: '同步插件配置',
+      pluginTotalHint: '总开关关着时，下面每个插件的开关都不生效。插件配置只以副本形式同步，不会改写对方机器的 DSH 配置。',
+      pluginUnavailable: '插件信息暂不可用',
+      pluginRetry: '重试',
+      pluginHasConfig: '有配置',
+      pluginNoConfig: '无配置',
+      pluginInstalled: '已安装',
+      pluginNotInstalled: '未安装',
+      pluginConfigKeys: '配置键',
+      pluginNoKeys: '没有配置键',
+      groupDsh: 'DSH 自身',
+      groupDshHint: '配置、技能、会话与凭据。',
+      groupPlugins: '插件',
+      groupPluginsHint: '插件清单、插件数据目录与插件配置副本。',
+      groupWorkspaces: '工作区',
+      groupWorkspacesHint: '每个工作区单独开关；工作区清单本身只做上报。',
+      groupOther: '其它范围项',
+      transportAtBottom: '传输方式',
+      transportMore: '更多传输设置在「传输通道」页签。',
+      stateSynced: '已同步',
+      stateChanged: '有改动',
+      statePending: '待推送',
+      stateOff: '不同步',
+      stateNew: '未纳入基线',
+      loading: '加载中…',
+      badgeOk: '已同步',
+      badgePending: '有待同步',
+      badgeError: '同步出错',
+      badgeUnknown: '未配置远端',
     };
 
     const EN = {
@@ -323,7 +396,7 @@ window.__ModuleLoader__.load({
       checkOk: 'All steps passed',
       checkFail: 'Problems found',
 
-      analysisTitle: 'How this machine looks',
+      analysisTitle: 'Overview',
       analysisCard: 'Local machine',
       analysisIntro: 'Reads the local DSH data layout — size and inventory only, nothing is modified.',
       analysisRun: 'Analyze this machine',
@@ -340,7 +413,7 @@ window.__ModuleLoader__.load({
       analysisNoData: 'no data',
       analysisErrors: 'Some items failed to read',
 
-      treeTitle: 'How this machine looks',
+      treeTitle: 'Overview',
       treeCard: 'Local machine',
       treeIntro: 'Lists local plugins, skills and sessions grouped by workspace — expand one to see whether each session will be synced.',
       treeRun: 'Read local inventory',
@@ -356,6 +429,7 @@ window.__ModuleLoader__.load({
       treeUnassigned: 'Unassigned workspaces',
       treePlugins: 'Plugins',
       treeSkills: 'Skills',
+      treeDsh: 'DSH config',
       wsOn: 'Sync this workspace',
       wsOff: 'Do not sync this workspace',
       wsNoSessions: 'No session under this workspace yet',
@@ -375,6 +449,76 @@ window.__ModuleLoader__.load({
       pushSync: 'Push & sync',
       wsScopeTitle: 'Sync per workspace',
       wsScopeHint: 'Turning off a workspace keeps its sessions local. Plugins, skills and config are unaffected.',
+
+      // —— dashboard / plugin page (2026-11-07 redesign) ——
+      dashTitle: 'Overview',
+      dashSubtitle: 'How this machine syncs',
+      kpiSynced: 'Synced items',
+      kpiPending: 'Pending',
+      kpiSessions: 'Sessions',
+      kpiWorkspaces: 'Workspaces',
+      kpiPlugins: 'Plugins',
+      kpiSize: 'Footprint',
+      cardStatus: 'Sync status',
+      cardScope: 'What to sync',
+      cardWorkspaces: 'Workspaces',
+      cardPlugins: 'Plugins',
+      cardSessions: 'Sessions',
+      cardStatusHint: 'Transport, sync target and the result of the last sync.',
+      cardScopeHint: 'Listed in sync-section order; the count is how many items can be synced.',
+      cardWsHint: 'One row per workspace; ones with a git repo can be pushed by hand.',
+      cardPluginHint: 'One row per plugin; open the page to toggle them individually.',
+      cardSessionHint: 'Most recently updated sessions.',
+      runNow: 'Sync now',
+      viewPlan: 'View plan',
+      openScope: 'Open scope',
+      openPlugins: 'Open plugins',
+      pushed: 'Push',
+      pulled: 'Pull',
+      conflicts: 'Conflicts',
+      switchOn: 'on',
+      switchOff: 'off',
+      gitRepo: 'git',
+      gitNone: 'no git',
+      gitRemote: 'remote',
+      gitCanPush: 'Has a git repo — you can push it yourself.',
+      gitOnlyPlugin: 'No git repo — only this plugin can sync it.',
+      archived: 'Archived',
+      syncedCount: 'Synced',
+      pendingCount: 'Pending',
+      archivedCount: 'Archived',
+      sessionsCount: 'Sessions',
+      pluginTab: 'Plugins',
+      pluginGroupTitle: 'Plugin config',
+      pluginTotalSwitch: 'Sync plugin config',
+      pluginTotalHint: 'While the master switch is off no per-plugin switch has any effect. Plugin config is synced as a copy only; the other machine\'s DSH config is never rewritten.',
+      pluginUnavailable: 'Plugin info unavailable',
+      pluginRetry: 'Retry',
+      pluginHasConfig: 'has config',
+      pluginNoConfig: 'no config',
+      pluginInstalled: 'installed',
+      pluginNotInstalled: 'not installed',
+      pluginConfigKeys: 'Config keys',
+      pluginNoKeys: 'No config keys',
+      groupDsh: 'DSH itself',
+      groupDshHint: 'Config, skills, sessions and credentials.',
+      groupPlugins: 'Plugins',
+      groupPluginsHint: 'Plugin list, plugin data dirs and plugin config copies.',
+      groupWorkspaces: 'Workspaces',
+      groupWorkspacesHint: 'One switch per workspace; the workspace list itself is report-only.',
+      groupOther: 'Other sections',
+      transportAtBottom: 'Transport',
+      transportMore: 'More transport settings live in the Transport tab.',
+      stateSynced: 'Synced',
+      stateChanged: 'Changed',
+      statePending: 'Pending',
+      stateOff: 'Not synced',
+      stateNew: 'Not in baseline',
+      loading: 'Loading…',
+      badgeOk: 'Synced',
+      badgePending: 'Pending sync',
+      badgeError: 'Sync failed',
+      badgeUnknown: 'No remote configured',
     };
 
     /* ---------- 2. 主题与小工具 ---------- */
@@ -502,6 +646,14 @@ window.__ModuleLoader__.load({
         tree: null,
         treeLoading: false,
         check: null,
+        // 插件清单（GET /plugins）。后端未上线时为 null，界面降级到 /workspaces 的插件列表。
+        plugins: null,
+        pluginsLoading: false,
+        pluginsError: '',
+        // 设置区页签跳转意图（主面板点击后让设置区跟着切页）。
+        navTab: null,
+        // 最近一次成功读到 /state 的时间戳。
+        statusAt: 0,
       },
       listeners: new Set(),
       set(patch) {
@@ -523,7 +675,9 @@ window.__ModuleLoader__.load({
     const actions = {
       async load(opts) {
         const probe = Boolean(opts && opts.probeRemote);
-        store.set({ loading: true });
+        // silent：后台轮询用。不转圈、不清空错误、不打断正在编辑的草稿。
+        const silent = Boolean(opts && opts.silent);
+        if (!silent) store.set({ loading: true });
         try {
           const res = await getJson(`${PREFIX}/state${probe ? '?remote=1' : ''}`);
           if (!res || !res.ok) throw new Error((res && res.error) || 'load failed');
@@ -532,11 +686,13 @@ window.__ModuleLoader__.load({
             status: res.data,
             draft: keepDraft ? store.state.draft : JSON.parse(JSON.stringify(res.data.settings || {})),
             error: '',
+            statusAt: Date.now(),
           });
         } catch (err) {
-          store.set({ error: String((err && err.message) || err) });
+          // 静默轮询失败不弹错，下一轮再试。
+          if (!silent) store.set({ error: String((err && err.message) || err) });
         } finally {
-          store.set({ loading: false });
+          if (!silent) store.set({ loading: false });
         }
       },
       patchDraft(fn) {
@@ -702,7 +858,76 @@ window.__ModuleLoader__.load({
         await actions.saveNow(draft);
         await actions.loadTree();
       },
+      /**
+       * 插件清单（GET /plugins）。后端未上线 / 请求失败时不抛错：
+       * 记录 pluginsError，界面回落到 /workspaces 里的插件列表，再不行就显示「暂不可用」。
+       */
+      async loadPlugins() {
+        store.set({ pluginsLoading: true, pluginsError: '' });
+        try {
+          const res = await getJson(`${PREFIX}/plugins`);
+          if (!res || !res.ok) throw new Error((res && res.error) || 'plugins unavailable');
+          store.set({ plugins: res.data || { plugins: [] } });
+        } catch (err) {
+          store.set({ plugins: null, pluginsError: String((err && err.message) || err) });
+        } finally {
+          store.set({ pluginsLoading: false });
+        }
+      },
+      /** 单个插件的同步开关：写 settings.pluginConfig.switches[key]。 */
+      async togglePlugin(key, enabled) {
+        if (!key) return;
+        const draft = JSON.parse(JSON.stringify(store.state.draft || {}));
+        const pluginConfig = { ...(draft.pluginConfig || {}) };
+        pluginConfig.switches = { ...(pluginConfig.switches || {}), [key]: Boolean(enabled) };
+        draft.pluginConfig = pluginConfig;
+        await actions.saveNow(draft);
+        await actions.loadPlugins();
+      },
+      /** 插件配置总开关：写 settings.pluginConfig.enabled。 */
+      async setPluginConfigEnabled(enabled) {
+        const draft = JSON.parse(JSON.stringify(store.state.draft || {}));
+        draft.pluginConfig = { ...(draft.pluginConfig || {}), enabled: Boolean(enabled) };
+        await actions.saveNow(draft);
+        await actions.loadPlugins();
+      },
+      /** 让设置区的页签跟着跳转（主面板 → 设置区）。 */
+      goTab(tab) {
+        store.set({ navTab: tab });
+      },
     };
+
+    /**
+     * 全局单例：每 30 秒静默拉一次 /state，让侧栏徽章与仪表盘保持新鲜。
+     * 只开一个定时器（不要每个组件各开一个）；拉取失败静默重试，不打断界面。
+     */
+    const statusWatcher = (() => {
+      const INTERVAL = 30000;
+      let timer = null;
+      let inFlight = false;
+      async function tick() {
+        if (inFlight) return;
+        inFlight = true;
+        try {
+          await actions.load({ silent: true });
+        } catch {
+          /* 静默失败：下一轮再试 */
+        } finally {
+          inFlight = false;
+        }
+      }
+      return {
+        start() {
+          if (timer) return;
+          tick();
+          timer = setInterval(tick, INTERVAL);
+        },
+        stop() {
+          if (timer) clearInterval(timer);
+          timer = null;
+        },
+      };
+    })();
 
     function useHub() {
       const [, force] = React.useState(0);
@@ -990,8 +1215,72 @@ window.__ModuleLoader__.load({
       );
     }
 
-    function SyncIcon({ size = 16 }) {
-      return h(
+    /* ---------- 2b. 同步状态小工具 ---------- */
+
+    /** 只订阅 store 的轻量 hook：不触发任何请求，用来给图标画徽章。 */
+    function useStoreState() {
+      const [, force] = React.useState(0);
+      React.useEffect(() => store.subscribe(() => force((n) => n + 1)), []);
+      return store.state;
+    }
+
+    /** 远端是否配好：没配好就没有同步可言（徽章画灰点）。 */
+    function hasRemoteTarget(status) {
+      if (!status) return false;
+      const settings = status.settings || {};
+      const remote = settings.remote || {};
+      const kind = status.transport || 'local';
+      if (kind === 'local') return Boolean(remote.path);
+      if (kind === 'git') return Boolean(remote.url || remote.repo);
+      return Boolean(remote.url);
+    }
+
+    /** 待同步条目数：优先用上次的计划，退回工作区树的统计。 */
+    function pendingCount(status, tree) {
+      const totals = status && status.lastPlan && status.lastPlan.totals;
+      if (totals) {
+        return (totals.push || 0) + (totals.pull || 0) + (totals.conflicts || 0);
+      }
+      const t = tree && tree.totals;
+      if (t) return (t.pending || 0) + (t.changed || 0);
+      return 0;
+    }
+
+    /**
+     * 侧栏徽章状态：
+     *   unknown 灰 = 没读到状态 / 没配远端 / 还没同步过
+     *   ok      绿 = 上次同步成功且没有待同步
+     *   pending 琥珀 = 有待同步条目
+     *   error   红 = 同步出错
+     */
+    function badgeKind(state) {
+      const status = state && state.status;
+      if (!status || !hasRemoteTarget(status)) return 'unknown';
+      if (status.lastError) return 'error';
+      if (pendingCount(status, state.tree) > 0) return 'pending';
+      if (status.lastSync) return 'ok';
+      return 'unknown';
+    }
+
+    /** remote URL → 主机名（去掉凭据，界面只给人看主机）。 */
+    function remoteHost(remote) {
+      const text = String(remote || '').trim();
+      if (!text) return '';
+      const scheme = text.match(/^[a-zA-Z][\w+.-]*:\/\/([^/@]+@)?([^/:]+)/);
+      if (scheme && scheme[2]) return scheme[2];
+      const scp = text.match(/^([^@]+)@([^:]+):/);
+      if (scp && scp[2]) return scp[2];
+      return text;
+    }
+
+    /**
+     * 同步中心图标。badge=true 时在图标右上角画一个状态小圆点
+     * （侧栏入口用；官方侧栏槽位只能渲染图标，状态没法放进 label）。
+     */
+    function SyncIcon({ size = 16, badge = false, t }) {
+      const state = useStoreState();
+      const kind = badgeKind(state);
+      const icon = h(
         'svg',
         {
           width: size,
@@ -1008,6 +1297,38 @@ window.__ModuleLoader__.load({
         h('path', { d: 'M12.5 2 15 4l-2.5 2' }),
         h('path', { d: 'M20.5 15.5A5.5 5.5 0 0 1 15 20H9.5' }),
         h('path', { d: 'M11.5 18 9 20l2.5 2' }),
+      );
+      if (!badge) return icon;
+      const color = kind === 'ok' ? C.ok : kind === 'pending' ? C.warn : kind === 'error' ? C.bad : C.dimmed;
+      const tr = (k, fb) => {
+        if (typeof t !== 'function') return fb;
+        const v = t(k);
+        return v && v !== k ? v : fb;
+      };
+      const title =
+        kind === 'ok' ? tr('badgeOk', '已同步')
+          : kind === 'pending' ? tr('badgePending', '有待同步')
+            : kind === 'error' ? tr('badgeError', '同步出错')
+              : tr('badgeUnknown', '未配置远端');
+      return h(
+        'span',
+        {
+          title,
+          style: { position: 'relative', display: 'inline-flex', lineHeight: 0, verticalAlign: 'middle' },
+        },
+        icon,
+        h('span', {
+          'aria-hidden': true,
+          style: {
+            position: 'absolute',
+            top: -1,
+            right: -2,
+            width: 7,
+            height: 7,
+            borderRadius: 4,
+            background: color,
+          },
+        }),
       );
     }
 
@@ -1094,24 +1415,450 @@ window.__ModuleLoader__.load({
       );
     }
 
+    /** KPI 小方块。 */
+    function KpiTile({ label, value, note, tone }) {
+      return h(
+        'div',
+        {
+          style: {
+            flex: '1 1 108px',
+            minWidth: 100,
+            border: `1px solid ${C.cardStroke}`,
+            background: C.cardFill,
+            borderRadius: 10,
+            padding: '7px 10px',
+          },
+        },
+        h('div', { style: { fontSize: 10, color: C.dim, marginBottom: 2, whiteSpace: 'nowrap' } }, label),
+        h('div', { style: { fontSize: 16, fontWeight: 600, lineHeight: 1.25, color: tone || 'inherit' } }, value),
+        note ? h('div', { style: { fontSize: 10, color: C.dimmed, marginTop: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' } }, note) : null,
+      );
+    }
+
+    /**
+     * 插件行数据：优先 GET /plugins，退回 /workspaces 里的插件列表；
+     * 两边都没有就返回 null（界面显示「插件信息暂不可用」）。
+     */
+    function pluginRows(hub) {
+      const draft = hub.draft || {};
+      const pluginConfig = draft.pluginConfig || {};
+      const switches = pluginConfig.switches || {};
+      const api = hub.plugins;
+      const tree = hub.tree;
+      let list = null;
+      if (api && !api.error && Array.isArray(api.plugins) && api.plugins.length) list = api.plugins;
+      else if (tree && Array.isArray(tree.plugins) && tree.plugins.length) list = tree.plugins;
+      else if (api && !api.error && Array.isArray(api.plugins)) list = api.plugins;
+      if (!list) return null;
+      return list.map((p) => {
+        const key = p.key || p.name || p.id || '';
+        const sw = switches[key];
+        return {
+          key,
+          name: p.name || key,
+          version: p.version || '',
+          installed: p.installed !== false,
+          hasConfig: Boolean(p.hasConfig),
+          configKeys: Array.isArray(p.configKeys) ? p.configKeys : [],
+          state: p.state || 'off',
+          bytes: p.bytes || 0,
+          syncEnabled: typeof sw === 'boolean' ? sw : Boolean(p.syncEnabled),
+        };
+      });
+    }
+
+    /** 插件 / 会话的同步状态徽章。 */
+    function stateBadge(state, t) {
+      const map = {
+        synced: { text: t('stateSynced'), color: C.ok },
+        changed: { text: t('stateChanged'), color: C.warn },
+        pending: { text: t('statePending'), color: C.brand },
+        new: { text: t('stateNew'), color: C.brand },
+        off: { text: t('stateOff'), color: C.dimmed },
+      };
+      const hit = map[state] || map.off;
+      return h(Badge, { text: hit.text, color: hit.color });
+    }
+
+    /** 工作区的 git 徽章：有仓库显示分支，有远端再显示主机名。 */
+    function GitBadge({ ws, t }) {
+      const git = ws && ws.git;
+      if (!git || !git.isRepo) return h(Badge, { text: t('gitNone'), color: C.dimmed });
+      const branch = git.branch || (git.detached ? 'detached' : '—');
+      const host = git.hasRemote ? remoteHost(git.remote) : '';
+      return h(
+        'span',
+        { style: { display: 'inline-flex', gap: 4, alignItems: 'center', flexWrap: 'wrap' } },
+        h(Badge, { text: `${t('gitRepo')} · ${branch}`, color: C.ok }),
+        host ? h(Badge, { text: `${t('gitRemote')} ${host}`, color: C.dim }) : null,
+      );
+    }
+
+    /** 卡片：同步状态。 */
+    function DashboardStatusCard({ hub, t }) {
+      const status = hub.status || {};
+      const kind = status.transport || 'local';
+      const plan = hub.plan || status.lastPlan || null;
+      const totals = plan && plan.totals ? plan.totals : null;
+      const steps = nextSteps(status, t);
+      const configured = hasRemoteTarget(status);
+      const kindLabel = { local: t('local'), git: t('git'), webdav: t('webdav') }[kind] || kind;
+      const row = (k, v) =>
+        h(
+          'div',
+          { key: k, style: { display: 'flex', gap: 8, fontSize: 11, padding: '1px 0', alignItems: 'baseline' } },
+          h('span', { style: { width: 62, flex: '0 0 62px', color: C.dim } }, k),
+          h('span', { style: { flex: 1, minWidth: 0, wordBreak: 'break-all' } }, v),
+        );
+      return h(
+        Card,
+        {
+          title: t('cardStatus'),
+          extra: h(
+            'div',
+            { style: { display: 'flex', gap: 8 } },
+            h(
+              Button,
+              {
+                onClick: () => {
+                  hub.actions.preview();
+                },
+                busy: hub.busy === 'plan',
+              },
+              t('viewPlan'),
+            ),
+            h(Button, { primary: true, onClick: hub.actions.run, busy: hub.busy === 'run' }, hub.busy === 'run' ? t('running') : t('runNow')),
+          ),
+        },
+        h('div', { style: { fontSize: 11, color: C.dim, marginBottom: 6, lineHeight: 1.55 } }, t('cardStatusHint')),
+        row(t('channel'), kindLabel),
+        row(t('target'), status.target || '—'),
+        row(t('lastSync'), status.lastSync ? relTime(status.lastSync.at) : t('never')),
+        totals
+          ? h(
+              'div',
+              { style: { display: 'flex', gap: 6, flexWrap: 'wrap', margin: '4px 0' } },
+              h(Badge, { text: `↑ ${t('pushed')} ${totals.push || 0}`, color: C.brand }),
+              h(Badge, { text: `↓ ${t('pulled')} ${totals.pull || 0}`, color: C.warn }),
+              h(Badge, { text: `⚠ ${t('conflicts')} ${totals.conflicts || 0}`, color: C.bad }),
+            )
+          : null,
+        !configured ? h('div', { style: { fontSize: 11, color: C.warn, marginTop: 4, lineHeight: 1.55 } }, t('nextNeedChannel')) : null,
+        steps.length
+          ? h('div', { style: { fontSize: 11, color: C.dim, marginTop: 4, lineHeight: 1.55 } }, steps[0].text)
+          : null,
+      );
+    }
+
+    /** 卡片：同步范围（按 /state 的 sections[] 顺序）。 */
+    function DashboardScopeCard({ hub, t }) {
+      const status = hub.status || {};
+      const sections = Array.isArray(status.sections) ? status.sections : [];
+      const draft = hub.draft || {};
+      const counts = {};
+      for (const item of sections) counts[item.id] = item.count;
+      return h(
+        Card,
+        {
+          title: t('cardScope'),
+          extra: h(
+            'button',
+            {
+              onClick: () => hub.actions.goTab('scope'),
+              style: {
+                border: 'none',
+                background: 'transparent',
+                color: C.brand,
+                font: 'inherit',
+                fontSize: 11,
+                cursor: 'pointer',
+                padding: 0,
+              },
+            },
+            t('openScope'),
+          ),
+        },
+        h('div', { style: { fontSize: 11, color: C.dim, marginBottom: 6, lineHeight: 1.55 } }, t('cardScopeHint')),
+        sections.length === 0
+          ? h(Empty, null, t('loading'))
+          : h(
+              'div',
+              { style: { display: 'flex', flexDirection: 'column', gap: 2 } },
+              sections.map((item) => {
+                const on = Boolean(draft.sections && draft.sections[item.id]);
+                return h(
+                  'div',
+                  {
+                    key: item.id,
+                    style: { display: 'flex', alignItems: 'center', gap: 8, padding: '2px 0', fontSize: 12 },
+                  },
+                  h(StatusDot, { ok: on, warn: false }),
+                  h(
+                    'span',
+                    { style: { flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' } },
+                    pickText(item.label, item.id),
+                  ),
+                  h(Badge, { text: on ? t('switchOn') : t('switchOff'), color: on ? C.brand : C.dimmed }),
+                  h('span', { style: { fontSize: 11, color: C.dimmed, width: 34, textAlign: 'right' } }, `${counts[item.id] || 0}`),
+                );
+              }),
+            ),
+      );
+    }
+
+    /** 卡片：工作区。 */
+    function DashboardWorkspaceCard({ hub, t }) {
+      const tree = hub.tree;
+      const workspaces = tree && !tree.error && Array.isArray(tree.workspaces) ? tree.workspaces : [];
+      const unassigned = tree && !tree.error && Array.isArray(tree.unassigned) ? tree.unassigned : [];
+      const all = workspaces.concat(unassigned);
+      return h(
+        Card,
+        {
+          title: t('cardWorkspaces'),
+          extra: h(
+            'button',
+            {
+              onClick: () => hub.actions.goTab('scope'),
+              style: {
+                border: 'none',
+                background: 'transparent',
+                color: C.brand,
+                font: 'inherit',
+                fontSize: 11,
+                cursor: 'pointer',
+                padding: 0,
+              },
+            },
+            t('openScope'),
+          ),
+        },
+        h('div', { style: { fontSize: 11, color: C.dim, marginBottom: 6, lineHeight: 1.55 } }, t('cardWsHint')),
+        !tree
+          ? h(Empty, null, t('loading'))
+          : tree.error
+            ? h(Banner, { kind: 'error' }, `${t('treeError')}: ${tree.error}`)
+            : all.length === 0
+              ? h(Empty, null, t('treeEmpty'))
+              : h(
+                  'div',
+                  null,
+                  all.map((ws) => {
+                    const sessions = Array.isArray(ws.sessions) ? ws.sessions : [];
+                    const synced = sessions.filter((s) => s.sync === 'synced').length;
+                    const pending = sessions.filter((s) => s.sync === 'pending' || s.sync === 'changed').length;
+                    const archived = ws.archivedCount != null
+                      ? ws.archivedCount
+                      : sessions.filter((s) => s.archived).length;
+                    return h(
+                      'div',
+                      {
+                        key: `dws:${ws.key}`,
+                        style: {
+                          display: 'flex',
+                          gap: 8,
+                          alignItems: 'center',
+                          padding: '5px 0',
+                          borderBottom: `1px solid ${C.separator}`,
+                        },
+                      },
+                      h(
+                        'div',
+                        { style: { flex: 1, minWidth: 0 } },
+                        h(
+                          'div',
+                          { style: { display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' } },
+                          h('span', { style: { fontSize: 12, fontWeight: 600 } }, ws.title || ws.key),
+                          h(GitBadge, { ws, t }),
+                        ),
+                        h(
+                          'div',
+                          { style: { fontSize: 10, color: C.dimmed, marginTop: 2 } },
+                          `${sessions.length} ${t('sessionsCount')} · ${t('syncedCount')} ${synced} · ${t('pendingCount')} ${pending} · ${t('archivedCount')} ${archived}`,
+                        ),
+                        h(
+                          'div',
+                          { style: { fontSize: 10, color: C.dim, marginTop: 1 } },
+                          ws.git && ws.git.isRepo ? t('gitCanPush') : t('gitOnlyPlugin'),
+                        ),
+                      ),
+                      h(Switch, {
+                        on: ws.enabled !== false,
+                        onChange: (next) => hub.actions.toggleWorkspace(ws.key, next),
+                        title: ws.enabled !== false ? t('wsOn') : t('wsOff'),
+                      }),
+                    );
+                  }),
+                ),
+      );
+    }
+
+    /** 卡片：插件。 */
+    function DashboardPluginCard({ hub, t }) {
+      const rows = pluginRows(hub);
+      const unavailable = hub.pluginsError;
+      return h(
+        Card,
+        {
+          title: t('cardPlugins'),
+          extra: h(
+            'button',
+            {
+              onClick: () => hub.actions.goTab('plugins'),
+              style: {
+                border: 'none',
+                background: 'transparent',
+                color: C.brand,
+                font: 'inherit',
+                fontSize: 11,
+                cursor: 'pointer',
+                padding: 0,
+              },
+            },
+            t('openPlugins'),
+          ),
+        },
+        h('div', { style: { fontSize: 11, color: C.dim, marginBottom: 6, lineHeight: 1.55 } }, t('cardPluginHint')),
+        unavailable ? h(Badge, { text: t('pluginUnavailable'), color: C.warn }) : null,
+        hub.pluginsLoading && !rows ? h(Empty, null, t('loading')) : null,
+        !hub.pluginsLoading && !rows
+          ? h(Empty, null, t('pluginUnavailable'))
+          : rows
+            ? h(
+                'div',
+                { style: { marginTop: 4 } },
+                rows.slice(0, 12).map((p) =>
+                  h(
+                    'div',
+                    {
+                      key: `dp:${p.key}`,
+                      style: {
+                        display: 'flex',
+                        gap: 8,
+                        alignItems: 'center',
+                        padding: '4px 0',
+                        borderBottom: `1px solid ${C.separator}`,
+                      },
+                    },
+                    h(
+                      'div',
+                      { style: { flex: 1, minWidth: 0 } },
+                      h(
+                        'div',
+                        { style: { display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' } },
+                        h('span', { style: { fontSize: 12 } }, p.name),
+                        p.version ? h(Badge, { text: p.version }) : null,
+                        h(Badge, { text: p.hasConfig ? t('pluginHasConfig') : t('pluginNoConfig'), color: p.hasConfig ? C.brand : C.dimmed }),
+                        p.configKeys.length ? h(Badge, { text: `${t('pluginConfigKeys')} ${p.configKeys.length}` }) : null,
+                      ),
+                    ),
+                    h(Switch, {
+                      on: p.syncEnabled,
+                      onChange: (next) => hub.actions.togglePlugin(p.key, next),
+                      title: p.syncEnabled ? t('pluginTotalSwitch') : t('pluginNoConfig'),
+                    }),
+                  ),
+                ),
+              )
+            : null,
+      );
+    }
+
+    /** 卡片：最近会话。 */
+    function DashboardSessionCard({ hub, t }) {
+      const tree = hub.tree;
+      const groups = [];
+      if (tree && !tree.error) {
+        for (const ws of Array.isArray(tree.workspaces) ? tree.workspaces : []) groups.push(ws);
+        for (const ws of Array.isArray(tree.unassigned) ? tree.unassigned : []) groups.push(ws);
+      }
+      const sessions = [];
+      for (const ws of groups) {
+        for (const s of Array.isArray(ws.sessions) ? ws.sessions : []) sessions.push(s);
+      }
+      sessions.sort((a, b) => (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0));
+      const recent = sessions.slice(0, 8);
+      return h(
+        Card,
+        { title: t('cardSessions') },
+        h('div', { style: { fontSize: 11, color: C.dim, marginBottom: 6, lineHeight: 1.55 } }, t('cardSessionHint')),
+        !tree
+          ? h(Empty, null, t('loading'))
+          : tree.error
+            ? h(Banner, { kind: 'error' }, `${t('treeError')}: ${tree.error}`)
+            : recent.length === 0
+              ? h(Empty, null, t('noSessions'))
+              : h(
+                  'div',
+                  null,
+                  recent.map((s) =>
+                    h(
+                      'div',
+                      {
+                        key: `ds:${s.sessionId}`,
+                        style: {
+                          display: 'flex',
+                          gap: 8,
+                          alignItems: 'center',
+                          padding: '4px 0',
+                          borderBottom: `1px solid ${C.separator}`,
+                        },
+                      },
+                      h(
+                        'div',
+                        { style: { flex: 1, minWidth: 0 } },
+                        h(
+                          'div',
+                          { style: { fontSize: 12, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' } },
+                          s.title || s.sessionId,
+                        ),
+                        h(
+                          'div',
+                          { style: { fontSize: 10, color: C.dimmed, marginTop: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' } },
+                          `${s.cwd || s.rel || '—'} · ${relTime(s.updatedAt || s.createdAt)}`,
+                        ),
+                      ),
+                      s.archived ? h(Badge, { text: t('archived'), color: C.warn }) : null,
+                      stateBadge(s.sync, t),
+                    ),
+                  ),
+                ),
+      );
+    }
+
+    /**
+     * 主面板 = 仪表盘：标题区 + KPI 条 + 卡片区。
+     * 数据来源：/state（KPI、sections）、/workspaces（工作区 / 会话 / 插件）、/plugins（插件详情）。
+     */
     function Panel({ t }) {
       const hub = useHub();
       const status = hub.status;
-      const draft = hub.draft;
+      const tree = hub.tree;
+      const totals = tree && !tree.error ? tree.totals || {} : {};
+      const plan = hub.plan || (status && status.lastPlan) || null;
+      const planTotals = plan && plan.totals ? plan.totals : null;
       const ver = status && status.version
         ? (status.version.desktop && status.version.desktop.desktopVersion) || status.version.version || ''
         : '';
-      const plan = hub.plan || status?.lastPlan || null;
-      const totals = plan && plan.totals ? plan.totals : null;
-      const steps = nextSteps(status, t);
-      const kind = status ? status.transport : 'local';
-      const configured = status
-        ? kind === 'local'
-          ? Boolean((status.settings?.remote || {}).path)
-          : kind === 'git'
-            ? Boolean((status.settings?.remote || {}).url)
-            : Boolean((status.settings?.remote || {}).url)
-        : false;
+      React.useEffect(() => {
+        if (!hub.tree && !hub.treeLoading) hub.actions.loadTree();
+        if (!hub.plugins && !hub.pluginsLoading) hub.actions.loadPlugins();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+      }, []);
+
+      const pending = planTotals
+        ? (planTotals.push || 0) + (planTotals.pull || 0) + (planTotals.conflicts || 0)
+        : (totals.pending || 0) + (totals.changed || 0);
+      const synced = totals.synced != null ? totals.synced : 0;
+      const sessionCount = totals.sessions != null ? totals.sessions : 0;
+      const workspaceCount = totals.workspaces != null ? totals.workspaces : 0;
+      const pluginTotal = hub.plugins && hub.plugins.totals && hub.plugins.totals.plugins != null
+        ? hub.plugins.totals.plugins
+        : (tree && tree.plugins ? tree.plugins.length : status && status.plugins ? status.plugins.length : 0);
+      const size = totals.bytes != null ? totals.bytes : (status && status.local ? status.local.bytes : 0);
+      const subtitle = status
+        ? `${t('lastSync')} ${status.lastSync ? relTime(status.lastSync.at) : t('never')} · ${synced} ${t('entries')} ${t('stateSynced')}`
+        : t('dashSubtitle');
 
       return h(
         'div',
@@ -1123,8 +1870,8 @@ window.__ModuleLoader__.load({
           h(
             'div',
             { style: { flex: 1, minWidth: 160 } },
-            h('div', { style: { fontSize: 14, fontWeight: 600 } }, t('title')),
-            h('div', { style: { fontSize: 11, color: C.dim } }, t('subtitle')),
+            h('div', { style: { fontSize: 14, fontWeight: 600 } }, t('dashTitle')),
+            h('div', { style: { fontSize: 11, color: C.dim } }, subtitle),
           ),
           ver ? h(Badge, { text: `DSH ${ver}` }) : null,
           status ? h(Badge, { text: `${t('device')}: ${status.device?.name || '—'}` }) : null,
@@ -1136,61 +1883,22 @@ window.__ModuleLoader__.load({
           : null,
         hub.error ? h(Banner, { kind: 'error' }, hub.error) : null,
 
-        status
-          ? h(
-              'div',
-              { style: { display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10, fontSize: 11, color: C.dim } },
-              h(
-                'span',
-                { style: { display: 'inline-flex', alignItems: 'center' } },
-                h(StatusDot, { ok: configured, warn: false }),
-                `${t('channel')}: ${pickText({ local: t('local'), git: t('git'), webdav: t('webdav') }[kind] || kind, kind)}`,
-              ),
-              h('span', null, `${t('target')}: ${status.target || '—'}`),
-              h('span', null, `${t('lastSync')}: ${status.lastSync ? relTime(status.lastSync.at) : t('never')}`),
-              h('span', null, `${status.local?.entries || 0} ${t('entries')} · ${status.bytesLabel || fmtBytes(status.local?.bytes || 0)}`),
-            )
-          : null,
-
         h(
-          Card,
-          { title: t('nextTitle') },
-          steps.length === 0
-            ? h(Empty, null, '…')
-            : steps.map((step, i) =>
-                h(
-                  'div',
-                  { key: step.id, style: { display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 12, padding: '2px 0' } },
-                  h('span', { style: { color: C.dim, flex: '0 0 16px' } }, `${i + 1}.`),
-                  h('span', { style: { flex: 1 } }, step.text),
-                ),
-              ),
+          'div',
+          { style: { display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 } },
+          h(KpiTile, { label: t('kpiSynced'), value: String(synced), note: t('stateSynced') }),
+          h(KpiTile, { label: t('kpiPending'), value: String(pending), note: t('cardScope'), tone: pending > 0 ? C.warn : undefined }),
+          h(KpiTile, { label: t('kpiSessions'), value: String(sessionCount) }),
+          h(KpiTile, { label: t('kpiWorkspaces'), value: String(workspaceCount) }),
+          h(KpiTile, { label: t('kpiPlugins'), value: String(pluginTotal) }),
+          h(KpiTile, { label: t('kpiSize'), value: fmtBytes(size || 0) }),
         ),
 
-        h(
-          Card,
-          {
-            title: t('planSummary'),
-            extra: h(
-              'div',
-              { style: { display: 'flex', gap: 8 } },
-              h(Button, { onClick: hub.actions.preview, busy: hub.busy === 'plan' }, hub.busy === 'plan' ? t('previewing') : t('preview')),
-              h(Button, { primary: true, onClick: hub.actions.run, busy: hub.busy === 'run' }, hub.busy === 'run' ? t('running') : t('run')),
-            ),
-          },
-          !totals
-            ? h(Empty, null, t('planEmpty'))
-            : h(
-                'div',
-                { style: { display: 'flex', gap: 8, flexWrap: 'wrap' } },
-                h(Badge, { text: `↑ ${totals.push} · ${fmtBytes(totals.pushBytes)}`, color: C.brand }),
-                h(Badge, { text: `↓ ${totals.pull} · ${fmtBytes(totals.pullBytes)}`, color: C.warn }),
-                h(Badge, { text: `⚠ ${totals.conflicts}`, color: C.bad }),
-                h(Badge, { text: `⤼ ${totals.skipped}` }),
-              ),
-        ),
-
-        h(Card, { title: t('quickScope'), extra: h('span', { style: { fontSize: 10, color: C.dimmed } }, t('quickScopeHint')) }, h(ScopeQuickToggles, { hub, t })),
+        h(DashboardStatusCard, { hub, t }),
+        h(DashboardScopeCard, { hub, t }),
+        h(DashboardPluginCard, { hub, t }),
+        h(DashboardWorkspaceCard, { hub, t }),
+        h(DashboardSessionCard, { hub, t }),
 
         h('div', { style: { fontSize: 10, color: C.dimmed, marginTop: 6 } }, `${NS} v${status?.plugin?.version || FALLBACK_VERSION}`),
       );
@@ -1295,11 +2003,25 @@ window.__ModuleLoader__.load({
     /** 本机现状：工作区 → 会话，可展开；下面还有插件和技能清单。 */
     function MachineTree({ hub, t }) {
       const tree = hub.tree;
+      const status = hub.status || {};
       if (!tree) return null;
       if (tree.error) return h(Banner, { kind: 'error' }, `${t('treeError')}: ${tree.error}`);
       const groups = tree.workspaces || [];
       const unassigned = tree.unassigned || [];
       const totals = tree.totals || {};
+      // 「DSH 配置」组：只取 DSH 自己的段（配置 / 插件数据），插件与工作区另立组。
+      const counts = {};
+      for (const item of status.sections || []) counts[item.id] = item.count;
+      const dshItems = (status.sectionDefs || [])
+        .filter((d) => d && (d.id === 'cordis' || d.id === 'pluginData'))
+        .map((d) => {
+          const sec = (status.sections || []).find((s) => s && s.id === d.id) || null;
+          return {
+            label: pickText(d.label, d.id),
+            count: counts[d.id] || 0,
+            enabled: sec ? sec.enabled !== false : true,
+          };
+        });
       return h(
         'div',
         null,
@@ -1317,34 +2039,20 @@ window.__ModuleLoader__.load({
         groups.length === 0 && unassigned.length === 0
           ? h(Empty, null, t('treeEmpty'))
           : null,
-        groups.map((ws) => h(WorkspaceGroup, { key: `ws:${ws.key}`, ws, hub, t })),
-        unassigned.length
+        dshItems.length
           ? h(
               'div',
-              { style: { marginTop: 8 } },
-              h(
-                'div',
-                { style: { fontSize: 11, fontWeight: 600, color: C.dim, marginBottom: 2 } },
-                t('treeUnassigned'),
-              ),
-              h(
-                'div',
-                { style: { fontSize: 11, color: C.dimmed, marginBottom: 4, lineHeight: 1.55 } },
-                t('wsUnassignedHint'),
-              ),
-              unassigned.map((ws) => h(WorkspaceGroup, { key: `un:${ws.key}`, ws, hub, t })),
-            )
-          : null,
-        (tree.plugins || []).length
-          ? h(
-              'div',
-              { style: { marginTop: 10 } },
-              h('div', { style: { fontSize: 11, fontWeight: 600, color: C.dim, marginBottom: 3 } }, t('treePlugins')),
+              { style: { marginTop: 6 } },
+              h('div', { style: { fontSize: 11, fontWeight: 600, color: C.dim, marginBottom: 3 } }, t('treeDsh')),
               h(
                 'div',
                 { style: { display: 'flex', gap: 6, flexWrap: 'wrap' } },
-                (tree.plugins || []).map((p) =>
-                  h(Badge, { key: p.name, text: `${p.name}${p.version ? ` ${p.version}` : ''}` }),
+                dshItems.map((d) =>
+                  h(Badge, {
+                    key: d.label,
+                    text: `${d.label} · ${d.count} ${t('count')}`,
+                    color: d.enabled ? undefined : C.dimmed,
+                  }),
                 ),
               ),
             )
@@ -1361,6 +2069,45 @@ window.__ModuleLoader__.load({
                   h(Badge, { key: s.name, text: `${s.name} · ${s.files} ${t('count')} · ${fmtBytes(s.bytes || 0)}` }),
                 ),
               ),
+            )
+          : null,
+        (tree.plugins || []).length
+          ? h(
+              'div',
+              { style: { marginTop: 8 } },
+              h('div', { style: { fontSize: 11, fontWeight: 600, color: C.dim, marginBottom: 3 } }, t('treePlugins')),
+              h(
+                'div',
+                { style: { display: 'flex', gap: 6, flexWrap: 'wrap' } },
+                (tree.plugins || []).map((p) =>
+                  h(Badge, { key: p.name, text: `${p.name}${p.version ? ` ${p.version}` : ''}` }),
+                ),
+              ),
+            )
+          : null,
+        groups.length
+          ? h(
+              'div',
+              { style: { marginTop: 10 } },
+              h('div', { style: { fontSize: 11, fontWeight: 600, color: C.dim, marginBottom: 3 } }, t('treeWs')),
+              groups.map((ws) => h(WorkspaceGroup, { key: `ws:${ws.key}`, ws, hub, t })),
+            )
+          : null,
+        unassigned.length
+          ? h(
+              'div',
+              { style: { marginTop: 8 } },
+              h(
+                'div',
+                { style: { fontSize: 11, fontWeight: 600, color: C.dim, marginBottom: 2 } },
+                t('treeUnassigned'),
+              ),
+              h(
+                'div',
+                { style: { fontSize: 11, color: C.dimmed, marginBottom: 4, lineHeight: 1.55 } },
+                t('wsUnassignedHint'),
+              ),
+              unassigned.map((ws) => h(WorkspaceGroup, { key: `un:${ws.key}`, ws, hub, t })),
             )
           : null,
       );
@@ -1627,263 +2374,381 @@ window.__ModuleLoader__.load({
       );
     }
 
+    /** 同步范围页里的 section 级开关行。 */
+    function ScopeSectionRow({ hub, t, def, count, disabled }) {
+      const draft = hub.draft || {};
+      const status = hub.status || {};
+      const on = Boolean(draft.sections && draft.sections[def.id]);
+      const secretFiles = status.secretFiles || {};
+      const secretCandidates = secretFiles.candidates || [];
+      const secretsOn = Boolean(draft.sections && draft.sections.secrets);
+      return h(
+        'div',
+        {
+          style: {
+            display: 'flex',
+            gap: 10,
+            alignItems: 'flex-start',
+            padding: '8px 0',
+            borderBottom: `1px solid ${C.separator}`,
+            opacity: disabled ? 0.5 : 1,
+          },
+        },
+        h(Switch, {
+          on,
+          disabled,
+          onChange: (next) => hub.actions.patchDraft((x) => { x.sections = { ...(x.sections || {}), [def.id]: next }; }),
+        }),
+        h(
+          'div',
+          { style: { flex: 1, minWidth: 0 } },
+          h(
+            'div',
+            { style: { display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' } },
+            h('span', { style: { fontSize: 12, fontWeight: 600 } }, pickText(def.label, def.id)),
+            def.kind === 'advisory' ? h(Badge, { text: '只读' }) : null,
+            def.kind === 'redacted' ? h(Badge, { text: '已脱敏' }) : null,
+            def.kind === 'secret' ? h(Badge, { text: '密钥', color: C.warn }) : null,
+            h(Badge, { text: `${count || 0} ${t('count')}` }),
+          ),
+          def.desc
+            ? h('div', { style: { fontSize: 11, color: C.dim, marginTop: 3, lineHeight: 1.55 } }, pickText(def.desc))
+            : null,
+          def.id === 'secrets'
+            ? h(
+                'div',
+                { style: { fontSize: 11, color: secretsOn ? C.warn : C.dimmed, marginTop: 4, lineHeight: 1.55 } },
+                h('div', null, secretsOn ? t('secretsOn') : t('secretsOff')),
+                secretsOn
+                  ? h('ul', { style: { margin: '3px 0 0', paddingLeft: 18 } },
+                      (secretFiles.files || secretCandidates).map((f) => h('li', { key: f }, h('code', { style: { fontSize: 11 } }, f))))
+                  : null,
+                h('div', { style: { marginTop: 3 } }, t('secretsNever')),
+                h('div', null, t('secretsBoth')),
+                secretsOn && (status.transport || 'local') === 'git'
+                  ? h('div', { style: { marginTop: 3, color: C.warn } }, t('secretsPublicRepo'))
+                  : null,
+              )
+            : null,
+        ),
+      );
+    }
+
+    /** 同步范围页里的工作区行：开关 + git 提示 + 跨机目录映射。 */
+    function ScopeWorkspaceRow({ hub, t, ws }) {
+      const sessions = Array.isArray(ws.sessions) ? ws.sessions : [];
+      const synced = sessions.filter((s) => s.sync === 'synced').length;
+      const pending = sessions.filter((s) => s.sync === 'pending' || s.sync === 'changed').length;
+      const archived = ws.archivedCount != null
+        ? ws.archivedCount
+        : sessions.filter((s) => s.archived).length;
+      return h(
+        'div',
+        {
+          style: {
+            display: 'flex',
+            gap: 10,
+            alignItems: 'flex-start',
+            padding: '8px 0',
+            borderBottom: `1px solid ${C.separator}`,
+          },
+        },
+        h(Switch, {
+          on: ws.enabled !== false,
+          onChange: (next) => hub.actions.toggleWorkspace(ws.key, next),
+        }),
+        h(
+          'div',
+          { style: { flex: 1, minWidth: 0 } },
+          h(
+            'div',
+            { style: { display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' } },
+            h('span', { style: { fontSize: 12, fontWeight: 600 } }, ws.title || ws.key),
+            h(GitBadge, { ws, t }),
+            h(Badge, { text: `${sessions.length} ${t('count')}` }),
+            h(Badge, { text: fmtBytes(ws.bytes || 0) }),
+          ),
+          h('div', { style: { fontSize: 11, color: C.dim, marginTop: 2, wordBreak: 'break-all' } }, ws.path || ''),
+          h(
+            'div',
+            { style: { fontSize: 10, color: C.dimmed, marginTop: 2 } },
+            `${t('syncedCount')} ${synced} · ${t('pendingCount')} ${pending} · ${t('archivedCount')} ${archived}`,
+          ),
+          h('div', { style: { fontSize: 10, color: C.dim, marginTop: 1 } }, ws.git && ws.git.isRepo ? t('gitCanPush') : t('gitOnlyPlugin')),
+          h(WorkspaceMapRow, { hub, t, ws }),
+        ),
+      );
+    }
+
+    /** 同步范围页里的插件行：单独同步开关。 */
+    function ScopePluginRow({ hub, t, p, disabled }) {
+      return h(
+        'div',
+        {
+          style: {
+            display: 'flex',
+            gap: 10,
+            alignItems: 'center',
+            padding: '6px 0',
+            borderBottom: `1px solid ${C.separator}`,
+            opacity: disabled ? 0.5 : 1,
+          },
+        },
+        h(Switch, {
+          on: p.syncEnabled,
+          disabled,
+          onChange: (next) => hub.actions.togglePlugin(p.key, next),
+        }),
+        h(
+          'div',
+          { style: { flex: 1, minWidth: 0 } },
+          h(
+            'div',
+            { style: { display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' } },
+            h('span', { style: { fontSize: 12 } }, p.name),
+            p.version ? h(Badge, { text: p.version }) : null,
+            h(Badge, { text: p.hasConfig ? t('pluginHasConfig') : t('pluginNoConfig'), color: p.hasConfig ? C.brand : C.dimmed }),
+            stateBadge(p.state, t),
+          ),
+          h(
+            'div',
+            { style: { fontSize: 10, color: C.dimmed, marginTop: 2, wordBreak: 'break-all' } },
+            p.configKeys.length
+              ? `${t('pluginConfigKeys')}: ${p.configKeys.slice(0, 6).join(', ')}${p.configKeys.length > 6 ? ' …' : ''}`
+              : t('pluginNoKeys'),
+          ),
+        ),
+      );
+    }
+
+    /**
+     * 同步范围页：分成三组 —— ① DSH 自身 ② 插件 ③ 工作区；传输方式留在最下面的小节。
+     * 字段缺失（git 为 null、archived 缺失、/plugins 404）一律降级显示，不崩。
+     */
     function ScopeTab({ hub, t }) {
       const status = hub.status;
       const draft = hub.draft;
       React.useEffect(() => {
         if (hub.sessions === null && hub.busy !== 'sessions') hub.actions.loadSessions();
         if (!hub.tree && !hub.treeLoading) hub.actions.loadTree();
+        if (!hub.plugins && !hub.pluginsLoading) hub.actions.loadPlugins();
         // eslint-disable-next-line react-hooks/exhaustive-deps
       }, []);
       if (!status || !draft) return null;
       const defs = status.sectionDefs || [];
       const counts = {};
       for (const item of status.sections || []) counts[item.id] = item.count;
-      const secretFiles = status.secretFiles || {};
-      const secretCandidates = secretFiles.candidates || [];
-      const secretsOn = Boolean(draft.sections && draft.sections.secrets);
-      const excluded = new Set((draft.sessions && draft.sessions.excludeIds) || []);
       const data = hub.sessions;
-      const saveBtn = h(Button, {
-        primary: true,
-        onClick: hub.actions.save,
-        busy: hub.busy === 'save',
-        disabled: !hub.dirty,
-      }, hub.dirty ? t('save') : t('saved'));
+      const excluded = new Set((draft.sessions && draft.sessions.excludeIds) || []);
+      const PLUGIN_SECTIONS = new Set(['plugins', 'pluginData', 'pluginConfig']);
+      const WS_SECTIONS = new Set(['workspaces']);
+      const dshDefs = defs.filter((d) => !PLUGIN_SECTIONS.has(d.id) && !WS_SECTIONS.has(d.id) && d.id !== 'custom');
+      const pluginDefs = defs.filter((d) => PLUGIN_SECTIONS.has(d.id));
+      const wsDefs = defs.filter((d) => WS_SECTIONS.has(d.id));
+      const pluginData = pluginRows(hub);
+      const pluginMaster = Boolean((draft.pluginConfig || {}).enabled);
+      const tree = hub.tree;
+      const treeError = tree && tree.error ? tree.error : '';
+      const wsList = tree && !treeError ? tree.workspaces || [] : [];
+      const unassigned = tree && !treeError ? tree.unassigned || [] : [];
+      const saveBtn = h(
+        Button,
+        { primary: true, onClick: hub.actions.save, busy: hub.busy === 'save', disabled: !hub.dirty },
+        hub.dirty ? t('save') : t('saved'),
+      );
 
       return h(
         'div',
         null,
         h('div', { style: { fontSize: 12, color: C.dim, marginBottom: 8 } }, t('scopeIntro')),
+
+        // ① DSH 自身
         h(
           Card,
-          null,
-          defs.map((def) => {
-            const on = Boolean(draft.sections && draft.sections[def.id]);
-            return h(
-              'div',
+          { title: t('groupDsh') },
+          h('div', { style: { fontSize: 11, color: C.dim, marginBottom: 4, lineHeight: 1.55 } }, t('groupDshHint')),
+          dshDefs.length === 0 ? h(Empty, null, t('loading')) : null,
+          dshDefs.map((def) => h(ScopeSectionRow, { key: def.id, hub, t, def, count: counts[def.id] })),
+          h(
+            'div',
+            { style: { marginTop: 10 } },
+            h('div', { style: { fontSize: 12, fontWeight: 600, marginBottom: 4 } }, t('sessionsLimit')),
+            h(
+              Row,
+              { label: t('maxBytes'), hint: t('maxBytesHint') },
+              h(TextInput, {
+                type: 'number',
+                value: Math.round((draft.sessions?.maxBytes || 0) / 1024 / 1024),
+                onChange: (v) => hub.actions.patchDraft((x) => { x.sessions = { ...(x.sessions || {}), maxBytes: Math.max(0, Number(v) || 0) * 1024 * 1024 }; }),
+                style: { width: 120 },
+              }),
+            ),
+            h(
+              Row,
+              { label: t('maxAgeDays'), hint: t('maxAgeDaysHint') },
+              h(TextInput, {
+                type: 'number',
+                value: draft.sessions?.maxAgeDays || 0,
+                onChange: (v) => hub.actions.patchDraft((x) => { x.sessions = { ...(x.sessions || {}), maxAgeDays: Math.max(0, Number(v) || 0) }; }),
+                style: { width: 120 },
+              }),
+            ),
+            h(
+              Collapsible,
               {
-                key: def.id,
-                style: {
-                  display: 'flex',
-                  gap: 10,
-                  alignItems: 'flex-start',
-                  padding: '8px 0',
-                  borderBottom: `1px solid ${C.separator}`,
+                title: t('sessionsList'),
+                meta: data ? `${data.total} · ${fmtBytes(data.bytes)}` : '',
+                onOpen: () => {
+                  if (hub.sessions === null) hub.actions.loadSessions();
                 },
               },
-              h(Switch, {
-                on,
-                onChange: (next) => hub.actions.patchDraft((x) => { x.sections = { ...(x.sections || {}), [def.id]: next }; }),
-              }),
-              h(
-                'div',
-                { style: { flex: 1, minWidth: 0 } },
-                h(
-                  'div',
-                  { style: { display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' } },
-                  h('span', { style: { fontSize: 12, fontWeight: 600 } }, pickText(def.label, def.id)),
-                  def.kind === 'advisory' ? h(Badge, { text: '只读' }) : null,
-                  def.kind === 'redacted' ? h(Badge, { text: '已脱敏' }) : null,
-                  def.kind === 'secret' ? h(Badge, { text: '密钥', color: C.warn }) : null,
-                  h(Badge, { text: `${counts[def.id] || 0} ${t('count')}` }),
-                ),
-                def.desc
-                  ? h('div', { style: { fontSize: 11, color: C.dim, marginTop: 3, lineHeight: 1.55 } }, pickText(def.desc))
-                  : null,
-                def.id === 'secrets'
-                  ? h(
+              h('div', { style: { fontSize: 11, color: C.dim, marginBottom: 6 } }, t('sessionsListHint')),
+              !data
+                ? h(Empty, null, hub.busy === 'sessions' ? '…' : t('noSessions'))
+                : data.sessions.length === 0
+                  ? h(Empty, null, t('noSessions'))
+                  : h(
                       'div',
-                      { style: { fontSize: 11, color: secretsOn ? C.warn : C.dimmed, marginTop: 4, lineHeight: 1.55 } },
-                      h('div', null, secretsOn ? t('secretsOn') : t('secretsOff')),
-                      secretsOn
-                        ? h('ul', { style: { margin: '3px 0 0', paddingLeft: 18 } },
-                            (secretFiles.files || secretCandidates).map((f) => h('li', { key: f }, h('code', { style: { fontSize: 11 } }, f))))
-                        : null,
-                      h('div', { style: { marginTop: 3 } }, t('secretsNever')),
-                      h('div', null, t('secretsBoth')),
-                      secretsOn && (status.transport || 'local') === 'git'
-                        ? h('div', { style: { marginTop: 3, color: C.warn } }, t('secretsPublicRepo'))
-                        : null,
-                    )
-                  : null,
-              ),
-            );
-          }),
-        ),
-        h(
-          Card,
-          { title: t('wsScopeTitle') },
-          h('div', { style: { fontSize: 11, color: C.dim, marginBottom: 6, lineHeight: 1.55 } }, t('wsScopeHint')),
-          !hub.tree
-            ? h(Button, { onClick: () => hub.actions.loadTree() }, t('treeRun'))
-            : null,
-          hub.tree
-            ? h(
-                'div',
-                null,
-                (hub.tree.workspaces || []).map((ws) =>
-                  h(
-                    'div',
-                    {
-                      key: `sc:${ws.key}`,
-                      style: {
-                        display: 'flex',
-                        gap: 10,
-                        alignItems: 'flex-start',
-                        padding: '8px 0',
-                        borderBottom: `1px solid ${C.separator}`,
-                      },
-                    },
-                    h(Switch, {
-                      on: ws.enabled !== false,
-                      onChange: (next) => hub.actions.toggleWorkspace(ws.key, next),
-                    }),
-                    h(
-                      'div',
-                      { style: { flex: 1, minWidth: 0 } },
-                      h(
-                        'div',
-                        { style: { display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' } },
-                        h('span', { style: { fontSize: 12, fontWeight: 600 } }, ws.title || ws.key),
-                        h(Badge, { text: `${(ws.sessions || []).length} ${t('count')}` }),
-                        h(Badge, { text: fmtBytes(ws.bytes || 0) }),
-                      ),
-                      h('div', { style: { fontSize: 11, color: C.dim, marginTop: 2 } }, ws.path || ''),
-                      h(WorkspaceMapRow, { hub, t, ws }),
-                    ),
-                  ),
-                ),
-                (hub.tree.unassigned || []).length
-                  ? h(
-                      'div',
-                      { style: { marginTop: 8 } },
-                      h('div', { style: { fontSize: 11, fontWeight: 600, color: C.dim, marginBottom: 3 } }, t('treeUnassigned')),
-                      h('div', { style: { fontSize: 11, color: C.dimmed, lineHeight: 1.55 } }, t('wsUnassignedHint')),
-                      (hub.tree.unassigned || []).map((ws) =>
+                      { style: { maxHeight: 320, overflow: 'auto' } },
+                      data.sessions.slice(0, 400).map((s) =>
                         h(
                           'div',
                           {
-                            key: `scu:${ws.key}`,
+                            key: s.sessionId,
                             style: {
                               display: 'flex',
                               gap: 10,
-                              alignItems: 'flex-start',
-                              padding: '8px 0',
-                              borderTop: `1px solid ${C.separator}`,
+                              alignItems: 'center',
+                              padding: '6px 0',
+                              borderBottom: `1px solid ${C.separator}`,
+                              opacity: excluded.has(s.sessionId) ? 0.5 : 1,
                             },
                           },
-                          h(Switch, {
-                            on: ws.enabled !== false,
-                            onChange: (next) => hub.actions.toggleWorkspace(ws.key, next),
-                          }),
                           h(
                             'div',
                             { style: { flex: 1, minWidth: 0 } },
                             h(
                               'div',
-                              { style: { display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' } },
-                              h('span', { style: { fontSize: 12, fontWeight: 600 } }, ws.title || ws.key),
-                              h(Badge, { text: `${(ws.sessions || []).length} ${t('count')}` }),
+                              { style: { fontSize: 12, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' } },
+                              pickText(s.title, s.sessionId),
                             ),
-                            h('div', { style: { fontSize: 11, color: C.dim, marginTop: 2 } }, ws.path || ''),
-                            h(WorkspaceMapRow, { hub, t, ws }),
+                            h(
+                              'div',
+                              { style: { fontSize: 11, color: C.dim, marginTop: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' } },
+                              `${s.cwd || '—'} · ${fmtTime(s.createdAt)} · ${fmtBytes(s.bytes)}`,
+                            ),
+                          ),
+                          s.synced ? h(Badge, { text: t('synced'), color: C.ok }) : h(Badge, { text: t('notSynced') }),
+                          h(
+                            Button,
+                            {
+                              small: true,
+                              onClick: () => {
+                                hub.actions.patchDraft((x) => {
+                                  x.sessions = x.sessions || { excludeIds: [] };
+                                  const list = new Set(x.sessions.excludeIds || []);
+                                  if (list.has(s.sessionId)) list.delete(s.sessionId);
+                                  else list.add(s.sessionId);
+                                  x.sessions.excludeIds = [...list];
+                                });
+                              },
+                            },
+                            excluded.has(s.sessionId) ? t('include') : t('exclude'),
                           ),
                         ),
                       ),
-                    )
-                  : null,
-              )
-            : null,
+                    ),
+            ),
+          ),
         ),
+
+        // ② 插件
         h(
           Card,
-          { title: t('sessionsLimit') },
+          { title: t('groupPlugins') },
+          h('div', { style: { fontSize: 11, color: C.dim, marginBottom: 6, lineHeight: 1.55 } }, t('groupPluginsHint')),
           h(
-            Row,
-            { label: t('maxBytes'), hint: t('maxBytesHint') },
-            h(TextInput, {
-              type: 'number',
-              value: Math.round((draft.sessions?.maxBytes || 0) / 1024 / 1024),
-              onChange: (v) => hub.actions.patchDraft((x) => { x.sessions = { ...(x.sessions || {}), maxBytes: Math.max(0, Number(v) || 0) * 1024 * 1024 }; }),
-              style: { width: 120 },
-            }),
-          ),
-          h(
-            Row,
-            { label: t('maxAgeDays'), hint: t('maxAgeDaysHint') },
-            h(TextInput, {
-              type: 'number',
-              value: draft.sessions?.maxAgeDays || 0,
-              onChange: (v) => hub.actions.patchDraft((x) => { x.sessions = { ...(x.sessions || {}), maxAgeDays: Math.max(0, Number(v) || 0) }; }),
-              style: { width: 120 },
-            }),
-          ),
-          h(Collapsible, {
-            title: t('sessionsList'),
-            meta: data ? `${data.total} · ${fmtBytes(data.bytes)}` : '',
-            onOpen: () => {
-              if (hub.sessions === null) hub.actions.loadSessions();
+            'div',
+            {
+              style: {
+                display: 'flex',
+                gap: 10,
+                alignItems: 'flex-start',
+                padding: '8px 0',
+                borderBottom: `1px solid ${C.separator}`,
+              },
             },
-          },
-            h('div', { style: { fontSize: 11, color: C.dim, marginBottom: 6 } }, t('sessionsListHint')),
-            !data
-              ? h(Empty, null, hub.busy === 'sessions' ? '…' : t('noSessions'))
-              : data.sessions.length === 0
-                ? h(Empty, null, t('noSessions'))
+            h(Switch, {
+              on: pluginMaster,
+              onChange: (next) => hub.actions.setPluginConfigEnabled(next),
+            }),
+            h(
+              'div',
+              { style: { flex: 1, minWidth: 0 } },
+              h(
+                'div',
+                { style: { display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' } },
+                h('span', { style: { fontSize: 12, fontWeight: 600 } }, t('pluginTotalSwitch')),
+                h(Badge, { text: pluginMaster ? t('switchOn') : t('switchOff'), color: pluginMaster ? C.brand : C.dimmed }),
+              ),
+              h('div', { style: { fontSize: 11, color: C.dim, marginTop: 3, lineHeight: 1.55 } }, t('pluginTotalHint')),
+            ),
+          ),
+          pluginDefs.map((def) =>
+            h(ScopeSectionRow, { key: def.id, hub, t, def, count: counts[def.id], disabled: !pluginMaster }),
+          ),
+          h(
+            'div',
+            { style: { marginTop: 8, opacity: pluginMaster ? 1 : 0.55 } },
+            h('div', { style: { fontSize: 12, fontWeight: 600, marginBottom: 4 } }, t('pluginGroupTitle')),
+            hub.pluginsLoading && !pluginData ? h(Empty, null, t('loading')) : null,
+            !pluginData
+              ? h(
+                  'div',
+                  { style: { fontSize: 11, color: C.dim, lineHeight: 1.55 } },
+                  h('div', null, t('pluginUnavailable')),
+                  hub.pluginsError
+                    ? h('div', { style: { color: C.dimmed, marginTop: 2, wordBreak: 'break-all' } }, hub.pluginsError)
+                    : null,
+                  h(Button, { small: true, onClick: () => hub.actions.loadPlugins() }, t('pluginRetry')),
+                )
+              : pluginData.length === 0
+                ? h(Empty, null, t('pluginUnavailable'))
                 : h(
                     'div',
-                    { style: { maxHeight: 320, overflow: 'auto' } },
-                    data.sessions.slice(0, 400).map((s) =>
-                      h(
-                        'div',
-                        {
-                          key: s.sessionId,
-                          style: {
-                            display: 'flex',
-                            gap: 10,
-                            alignItems: 'center',
-                            padding: '6px 0',
-                            borderBottom: `1px solid ${C.separator}`,
-                            opacity: excluded.has(s.sessionId) ? 0.5 : 1,
-                          },
-                        },
-                        h(
-                          'div',
-                          { style: { flex: 1, minWidth: 0 } },
-                          h(
-                            'div',
-                            { style: { fontSize: 12, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' } },
-                            pickText(s.title, s.sessionId),
-                          ),
-                          h(
-                            'div',
-                            { style: { fontSize: 11, color: C.dim, marginTop: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' } },
-                            `${s.cwd || '—'} · ${fmtTime(s.createdAt)} · ${fmtBytes(s.bytes)}`,
-                          ),
-                        ),
-                        s.synced ? h(Badge, { text: t('synced'), color: C.ok }) : h(Badge, { text: t('notSynced') }),
-                        h(
-                          Button,
-                          {
-                            small: true,
-                            onClick: () => {
-                              hub.actions.patchDraft((x) => {
-                                x.sessions = x.sessions || { excludeIds: [] };
-                                const list = new Set(x.sessions.excludeIds || []);
-                                if (list.has(s.sessionId)) list.delete(s.sessionId);
-                                else list.add(s.sessionId);
-                                x.sessions.excludeIds = [...list];
-                              });
-                            },
-                          },
-                          excluded.has(s.sessionId) ? t('include') : t('exclude'),
-                        ),
-                      ),
+                    null,
+                    pluginData.map((p) =>
+                      h(ScopePluginRow, { key: `sp:${p.key}`, hub, t, p, disabled: !pluginMaster }),
                     ),
                   ),
           ),
         ),
+
+        // ③ 工作区
+        h(
+          Card,
+          { title: t('groupWorkspaces') },
+          h('div', { style: { fontSize: 11, color: C.dim, marginBottom: 6, lineHeight: 1.55 } }, t('groupWorkspacesHint')),
+          wsDefs.map((def) => h(ScopeSectionRow, { key: def.id, hub, t, def, count: counts[def.id] })),
+          hub.treeLoading && !tree ? h(Empty, null, t('treeLoading')) : null,
+          !hub.treeLoading && !tree
+            ? h(Button, { onClick: () => hub.actions.loadTree() }, t('treeRun'))
+            : null,
+          treeError ? h(Banner, { kind: 'error' }, `${t('treeError')}: ${treeError}`) : null,
+          tree && !treeError && wsList.length === 0 ? h(Empty, null, t('treeEmpty')) : null,
+          wsList.map((ws) => h(ScopeWorkspaceRow, { key: `sc:${ws.key}`, hub, t, ws })),
+          unassigned.length
+            ? h(
+                'div',
+                { style: { marginTop: 8 } },
+                h('div', { style: { fontSize: 11, fontWeight: 600, color: C.dim, marginBottom: 3 } }, t('treeUnassigned')),
+                h('div', { style: { fontSize: 11, color: C.dimmed, lineHeight: 1.55 } }, t('wsUnassignedHint')),
+                unassigned.map((ws) => h(ScopeWorkspaceRow, { key: `scu:${ws.key}`, hub, t, ws })),
+              )
+            : null,
+        ),
+
+        // 自定义路径
         h(
           Card,
           { title: t('customPaths') },
@@ -1902,6 +2767,21 @@ window.__ModuleLoader__.load({
           ),
           h(CustomPathAdder, { hub, t }),
         ),
+
+        // 传输方式：留在底部，独立小节（详细设置在「传输通道」页签）
+        h(
+          Card,
+          { title: t('transportAtBottom') },
+          h('div', { style: { fontSize: 11, color: C.dim, marginBottom: 6, lineHeight: 1.55 } }, t('transportMore')),
+          h(
+            'div',
+            { style: { display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' } },
+            h(Badge, { text: (status.transport || 'local').toUpperCase(), color: C.brand }),
+            h(Badge, { text: status.target || '—' }),
+            h(Button, { small: true, onClick: () => hub.actions.goTab('transport') }, t('transportTab')),
+          ),
+        ),
+
         h('div', { style: { display: 'flex', gap: 8 } }, saveBtn, hub.dirty ? h('span', { style: { fontSize: 11, color: C.warn, alignSelf: 'center' } }, '●') : null),
       );
     }
@@ -2067,6 +2947,104 @@ window.__ModuleLoader__.load({
       );
     }
 
+    /**
+     * 插件页：每个插件一行 —— 名称、版本、是否安装、有无配置、配置键摘要、单独同步开关、状态徽章。
+     * /plugins 还没上线时退回 /workspaces 的插件列表；两边都没有就显示「插件信息暂不可用」，不崩。
+     */
+    function PluginsTab({ hub, t }) {
+      React.useEffect(() => {
+        if (!hub.plugins && !hub.pluginsLoading) hub.actions.loadPlugins();
+        if (!hub.tree && !hub.treeLoading) hub.actions.loadTree();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+      }, []);
+      const rows = pluginRows(hub);
+      const pluginMaster = Boolean((hub.draft || {}).pluginConfig?.enabled);
+      const totals = hub.plugins && hub.plugins.totals ? hub.plugins.totals : null;
+      return h(
+        'div',
+        null,
+        h(
+          Card,
+          { title: t('pluginTotalSwitch') },
+          h('div', { style: { fontSize: 11, color: C.dim, marginBottom: 6, lineHeight: 1.55 } }, t('pluginTotalHint')),
+          h(
+            'div',
+            { style: { display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' } },
+            h(Switch, {
+              on: pluginMaster,
+              onChange: (next) => hub.actions.setPluginConfigEnabled(next),
+            }),
+            h(Badge, { text: pluginMaster ? t('switchOn') : t('switchOff'), color: pluginMaster ? C.brand : C.dimmed }),
+            totals
+              ? h(Badge, { text: `${totals.plugins || 0} · ${totals.withConfig || 0} ${t('pluginHasConfig')}` })
+              : null,
+          ),
+        ),
+        h(
+          Card,
+          { title: t('pluginGroupTitle') },
+          hub.pluginsLoading && !rows ? h(Empty, null, t('loading')) : null,
+          !rows
+            ? h(
+                'div',
+                { style: { fontSize: 11, color: C.dim, lineHeight: 1.55 } },
+                h('div', null, t('pluginUnavailable')),
+                hub.pluginsError
+                  ? h('div', { style: { color: C.dimmed, marginTop: 2, wordBreak: 'break-all' } }, hub.pluginsError)
+                  : null,
+                h(Button, { small: true, onClick: () => hub.actions.loadPlugins() }, t('pluginRetry')),
+              )
+            : rows.length === 0
+              ? h(Empty, null, t('pluginUnavailable'))
+              : h(
+                  'div',
+                  { style: { opacity: pluginMaster ? 1 : 0.55 } },
+                  rows.map((p) =>
+                    h(
+                      'div',
+                      {
+                        key: `pt:${p.key}`,
+                        style: {
+                          display: 'flex',
+                          gap: 10,
+                          alignItems: 'center',
+                          padding: '8px 0',
+                          borderBottom: `1px solid ${C.separator}`,
+                        },
+                      },
+                      h(Switch, {
+                        on: p.syncEnabled,
+                        disabled: !pluginMaster,
+                        onChange: (next) => hub.actions.togglePlugin(p.key, next),
+                      }),
+                      h(
+                        'div',
+                        { style: { flex: 1, minWidth: 0 } },
+                        h(
+                          'div',
+                          { style: { display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' } },
+                          h('span', { style: { fontSize: 12, fontWeight: 600 } }, p.name),
+                          p.version ? h(Badge, { text: p.version }) : null,
+                          h(Badge, { text: p.installed ? t('pluginInstalled') : t('pluginNotInstalled'), color: p.installed ? C.ok : C.dimmed }),
+                          h(Badge, { text: p.hasConfig ? t('pluginHasConfig') : t('pluginNoConfig'), color: p.hasConfig ? C.brand : C.dimmed }),
+                          stateBadge(p.state, t),
+                        ),
+                        h(
+                          'div',
+                          { style: { fontSize: 10, color: C.dimmed, marginTop: 2, wordBreak: 'break-all' } },
+                          p.configKeys.length
+                            ? `${t('pluginConfigKeys')} (${p.configKeys.length}): ${p.configKeys.slice(0, 8).join(', ')}${p.configKeys.length > 8 ? ' …' : ''}`
+                            : t('pluginNoKeys'),
+                        ),
+                        p.bytes ? h('div', { style: { fontSize: 10, color: C.dim, marginTop: 1 } }, fmtBytes(p.bytes)) : null,
+                      ),
+                    ),
+                  ),
+                ),
+        ),
+      );
+    }
+
     function Section({ t }) {
       const hub = useHub();
       const [tab, setTab] = React.useState(() => {
@@ -2092,8 +3070,22 @@ window.__ModuleLoader__.load({
       const tabs = [
         { id: 'overview', label: t('overviewTab') },
         { id: 'scope', label: t('scopeTab') },
+        { id: 'plugins', label: t('pluginTab') },
         { id: 'transport', label: t('transportTab') },
       ];
+
+      // 主面板里的「打开同步范围 / 打开插件」会写 store.navTab，这里跟着切页签。
+      React.useEffect(() => {
+        if (!hub.navTab || hub.navTab === tab) return;
+        setTab(hub.navTab);
+        try {
+          localStorage.setItem(`${NS}:tab`, hub.navTab);
+        } catch {
+          /* ignore */
+        }
+        hub.actions.goTab(null);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+      }, [hub.navTab]);
 
       return h(
         'div',
@@ -2149,7 +3141,9 @@ window.__ModuleLoader__.load({
             ? h(OverviewTab, { hub, t })
             : tab === 'scope'
               ? h(ScopeTab, { hub, t })
-              : h(TransportTab, { hub, t }),
+              : tab === 'plugins'
+                ? h(PluginsTab, { hub, t })
+                : h(TransportTab, { hub, t }),
         h('div', { style: { fontSize: 10, color: C.dimmed, marginTop: 8 } }, `${NS} v${status?.plugin?.version || FALLBACK_VERSION}`),
       );
     }
@@ -2172,6 +3166,13 @@ window.__ModuleLoader__.load({
         }
         TT = t;
 
+        // 全局单例轮询：侧栏徽章与仪表盘 30 秒刷新一次（失败静默重试，不打断界面）。
+        try {
+          statusWatcher.start();
+        } catch {
+          /* 轮询起不来不影响主流程 */
+        }
+
         // 主面板：左上角那一页，日常同步台。
         const offPanel = ctx.slots.inject('main', () =>
           ctx.slots.register({ name: 'main', key: PANEL_ID, locale: NS, inject: () => ({ t }) }, Panel),
@@ -2186,7 +3187,7 @@ window.__ModuleLoader__.load({
               label: () => (t ? t('nav') : '同步中心'),
               locale: NS,
             },
-            (owner) => h(SyncIcon, { size: (owner && owner.size) || 16 }),
+            (owner) => h(SyncIcon, { size: (owner && owner.size) || 16, badge: true, t }),
           ),
         );
         // 设置区：配置中心。
@@ -2205,6 +3206,11 @@ window.__ModuleLoader__.load({
         );
 
         return () => {
+          try {
+            statusWatcher.stop();
+          } catch {
+            /* ignore */
+          }
           try {
             if (typeof offRow === 'function') offRow();
           } catch {

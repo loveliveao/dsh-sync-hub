@@ -60,6 +60,7 @@ dsh plugin --profile <profile> add file:D:\dsh-sync-hub
 | --- | --- | --- | --- |
 | DSH 配置 | `profiles/<profile>/cordis.patch.yml`、`cordis.yml` | 开 | 模型提供商、界面、插件参数；**字面量密钥导出时脱敏**为 `<redacted>` |
 | 插件清单 | profile `package.json` 的依赖与 bundles | 开 | **只读上报**，绝不自动安装（bundles 里的未安装项会让 DSH 启动失败） |
+| 插件配置副本 | 各插件在 `cordis.patch.yml` 里的 `config` 块 | **关** | **只读副本**：解析 + 脱敏后写到 `sync-hub/reports/plugin-config/<插件>.yml`，**绝不改写对方的 DSH 配置**（见下方说明） |
 | 技能库 | `~/.dsh/skills` 整棵树 | 开 | 技能里若写了密钥，导出时同样脱敏 |
 | 会话 | `~/.dsh/sessions/**/session.v4.jsonl.zstd` | 开 | 按会话合并，**不会删除**另一台机器的会话 |
 | 凭据与密钥 | `.credentials.yaml`、密钥库、网关 key | **关** | 默认关闭；开启后这些文件与配置里的明文密钥会一起上传（见下方「凭据开关」） |
@@ -83,6 +84,18 @@ dsh plugin --profile <profile> add file:D:\dsh-sync-hub
 而你又打开了「凭据与密钥」，同步会被**直接拦住**，并在计划页写明原因。
 公开仓 + 明文 key 等于把 key 发给所有人，所以这里不给「先推了再说」的选项。
 处理办法：把仓库改成私有，或者先关掉凭据开关。
+
+### 插件配置副本（只读副本，不改对方配置）
+
+「插件配置副本」默认关闭。它把 `profiles/<profile>/cordis.patch.yml` 里每个插件的 `config` 块
+用自研的行级 YAML 解析器读出来（不依赖 `yaml` / `js-yaml`），敏感键（`key` / `token` / `secret` /
+`password` / `cookie` / `auth` / `credential` 等）替换成 `<redacted>`，而 `apiKeyEnv` 这类
+**环境变量名**保持原样，然后作为**副本**写到 `sync-hub/reports/plugin-config/<插件名>.yml`。
+
+- 它只是「让对方看一眼本机插件配了什么」，**不会**把配置写回对方的 `cordis.patch.yml`；
+- 总开关 `pluginConfig.enabled` 关着时一条都不采；打开后还要给每个插件单独打开
+  `pluginConfig.switches[<插件包名>]`；
+- 单个插件解析失败只降级成「无配置」，不影响其它插件。
 
 ### 始终排除的清单
 
@@ -185,14 +198,14 @@ blobs/ab/abcdef...                    # 内容寻址的 blob，按 sha 前两位
 2. **下一步**：根据当前状态只给一条指引（没设目标 → 先去设通道；缺令牌 → 先填令牌；
    没检查过 → 先检查连接；有变更 → 先预览；有冲突 → 先定策略）。
 3. **待同步**：↑上传 / ↓下载 / ⚠冲突 / ⤼跳过 四枚计数，配「预览变更」和「同步」按钮。
-4. **同步范围**：七个开关，改一下立即保存。
+4. **同步范围**：逐段开关（含「插件配置副本」），改一下立即保存。
 
 **设置 → 同步中心（配置中心）**
 
 - **概览**：折叠的「这台机器现在怎么样」（工作区、插件、技能、会话数量与体积、
   **故意不同步**的目录及体积、凭据文件清单——只列路径和大小，不读取内容）；
   计划与备份（冲突策略、备份份数、预览、同步、备份列表）；隐私说明。
-- **同步范围**：七个范围的开关与逐条说明、**按工作区分别同步**（每工作区开关 + 跨机目录映射）、
+- **同步范围**：各范围的开关与逐条说明、**按工作区分别同步**（每工作区开关 + 跨机目录映射）、
   会话体积/天数限制、自定义路径。
 - **传输通道**：三种通道三选一、参数、令牌、连接检查清单。
 
@@ -206,7 +219,21 @@ blobs/ab/abcdef...                    # 内容寻址的 blob，按 sha 前两位
 | `sync_hub_sessions` | 列出会话（标题、工作区、大小、是否已在远端） |
 
 HTTP 接口（前缀 `/dsh-sync-hub`）：`GET /state`、`GET /status?remote=1`、`GET /analysis`、
-`GET /sessions`、`GET /backups`、`POST /settings`、`POST /secret`、`POST /test`、`POST /plan`、`POST /run`。
+`GET /sessions`、`GET /plugins`、`GET /workspaces`、`GET /backups`、`POST /settings`、`POST /secret`、
+`POST /test`、`POST /plan`、`POST /run`。
+
+`GET /plugins` 列出本机插件清单与配置状态：
+
+```json
+{ "ok": true, "data": { "generatedAt": "...", "plugins": [{ "key": "@deepseek-ai/dsh-llm-pi-ai", "name": "@deepseek-ai/dsh-llm-pi-ai", "version": "1.6.0", "installed": true, "hasConfig": true, "configKeys": ["providers"], "configPaths": ["providers"], "config": {}, "redacted": true, "state": "pending", "syncEnabled": false, "bytes": 0 }], "totals": { "plugins": 1, "withConfig": 1, "enabled": 0 } } }
+```
+
+`key` 是插件包名（没有包名时退回配置里的 id），`version` 取自 profile `package.json`（未知为 `null`），
+`config` 已脱敏，`state` 取 `off` / `pending` / `synced` / `changed`。
+
+`GET /workspaces` 除了工作区与会话树，还带上每个工作区的 `git` 信息
+（`{ isRepo, hasRemote, remote, branch, detached }`，远端地址会去掉凭据）、`archivedCount`、
+`pendingCount`；会话行带 `archived`，`totals.archived` 是已归档会话数。
 
 ## 八、不做的事（边界）
 
@@ -220,7 +247,7 @@ HTTP 接口（前缀 `/dsh-sync-hub`）：`GET /state`、`GET /status?remote=1`�
 ## 九、开发
 
 ```bash
-npm test                     # 一次跑完下面 8 个测试文件（node --test "tests/*.test.mjs"）
+npm test                     # 一次跑完下面 11 个测试文件（node --test "tests/*.test.mjs"）
 node tests/smoke.mjs           # 无宿主冒烟：采集 → 推送 → 二次计划 → 伪造远端会话可拉取
 node tests/secrets.test.mjs    # 凭据开关：关闭时不上传，打开时只放行那 3 个已知文件
 node tests/transport.test.mjs  # 三种通道的检查步骤与「不泄漏令牌」
@@ -229,6 +256,10 @@ node tests/analysis.test.mjs   # 本机盘点：坏文件不抛异常、3 秒内
 node tests/session-canon.test.mjs  # 会话文件名归一化：跨机同名不打架
 node tests/cross-machine.test.mjs  # 双机模拟：推送、拉取、冲突、回滚
 node tests/defensive.test.mjs      # 防御性：hub 异常不冒泡、apply 遇坏宿主不崩
+node tests/git-info.test.mjs       # 仓库信息：远端去凭据、分支、detached、异常降级
+node tests/archive.test.mjs        # 会话归档：只增不减、写盘前备份、失败降级
+node tests/plugin-config.test.mjs  # 插件配置解析：嵌套、行内注释、!!js、敏感键脱敏
+node tests/contract-endpoints.test.mjs  # /plugins 与 /workspaces 的字段形状
 ```
 
 目录：
@@ -237,6 +268,9 @@ node tests/defensive.test.mjs      # 防御性：hub 异常不冒泡、apply 遇
 index.js             服务端入口（name / inject / apply）
 lib/paths.mjs        路径解析（全部限制在 $DSH_HOME 内）
 lib/sections.mjs     八个范围的采集与脱敏
+lib/git-info.mjs     仓库信息只读探测（远端去凭据、分支、detached）
+lib/archive.mjs      会话归档读写（只增不减，写盘前备份）
+lib/plugin-config.mjs  cordis.patch.yml 的 config 解析与脱敏（自研行级 YAML 解析器）
 lib/privacy.mjs      隐私红线、脱敏规则、凭据开关判定
 lib/analysis.mjs     本机现状盘点（工作区/插件/技能/会话/故意不同步/凭据清单）
 lib/version.mjs      DSH 版本探测（asar 包 / runtime.json / 环境变量）
