@@ -6,6 +6,7 @@
  */
 import { createHandler } from './lib/server.mjs'
 import { Hub } from './lib/hub.mjs'
+import { degradedHub } from './lib/degraded.mjs'
 import { registerTools } from './lib/tools.mjs'
 import { loadState, saveState, defaultState } from './lib/state.mjs'
 import { detectVersion, pluginVersion } from './lib/version.mjs'
@@ -34,23 +35,44 @@ export function apply(ctx, config = {}) {
       }
     },
   }
-  const hub = new Hub(ctx, { name, version: PLUGIN_VERSION })
+  // Hub 构造失败也不能让插件加载失败 —— 退化成只报错的空壳，界面与工具仍然可用。
+  let hub
+  try {
+    hub = new Hub(ctx, { name, version: PLUGIN_VERSION })
+  } catch (err) {
+    const message = String((err && err.message) || err)
+    logger.warn(`[sync-hub] 初始化失败，已降级为只读模式：${message}`)
+    hub = degradedHub(message, { name, version: PLUGIN_VERSION })
+  }
 
   // 首次加载：把 cordis.patch.yml 里的 config 播种成 state.json，之后界面改动为准。
   seedFromConfig(config, logger).catch((err) => logger.warn(`[sync-hub] 初始化设置失败：${err && err.message}`))
 
   ctx.effect(
-    () =>
-      ctx.webServer.register({
-        kind: 'prefix',
-        path: '/dsh-sync-hub',
-        handler: createHandler(hub, (message) => logger.warn(message)),
-      }),
+    () => {
+      try {
+        return ctx.webServer.register({
+          kind: 'prefix',
+          path: '/dsh-sync-hub',
+          handler: createHandler(hub, (message) => logger.warn(message)),
+        })
+      } catch (err) {
+        logger.warn(`[sync-hub] HTTP 路由注册失败：${String((err && err.message) || err)}`)
+        return () => {}
+      }
+    },
     'dsh-sync-hub: http routes',
   )
 
   ctx.effect(
-    () => registerTools(ctx, hub),
+    () => {
+      try {
+        return registerTools(ctx, hub)
+      } catch (err) {
+        logger.warn(`[sync-hub] 工具注册失败：${String((err && err.message) || err)}`)
+        return () => {}
+      }
+    },
     'dsh-sync-hub: agent tools',
   )
 

@@ -213,7 +213,10 @@ node tests/smoke.mjs           # 无宿主冒烟：采集 → 推送 → 二次�
 node tests/secrets.test.mjs    # 凭据开关：关闭时不上传，打开时只放行那 3 个已知文件
 node tests/transport.test.mjs  # 三种通道的检查步骤与「不泄漏令牌」
 node tests/git-guard.test.mjs  # Git 安全：令牌走环境变量、公开仓库闸门
-node --test tests/analysis.test.mjs   # 本机盘点：坏文件不抛异常、3 秒内返回
+node tests/analysis.test.mjs   # 本机盘点：坏文件不抛异常、3 秒内返回
+node tests/session-canon.test.mjs  # 会话文件名归一化：跨机同名不打架
+node tests/cross-machine.test.mjs  # 双机模拟：推送、拉取、冲突、回滚
+node tests/defensive.test.mjs      # 防御性：hub 异常不冒泡、apply 遇坏宿主不崩
 ```
 
 目录：
@@ -230,6 +233,7 @@ lib/manifest.mjs     远端清单格式
 lib/engine.mjs       差异决策、冲突、备份、应用
 lib/transport/       local / git / webdav + 共享基类（检查步骤统一在这里）
 lib/hub.mjs          门面：状态、计划、执行、备份
+lib/degraded.mjs     初始化失败时的降级 Hub（只报错，不抛异常）
 lib/server.mjs       HTTP 路由
 lib/tools.mjs        四个 Agent 工具
 client.js            主面板 + 配置中心 UI（手写 JS，仅 require('react')）

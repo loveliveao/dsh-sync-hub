@@ -28,7 +28,8 @@
     "tests/git-guard.test.mjs",
     "tests/analysis.test.mjs",
     "tests/session-canon.test.mjs",
-    "tests/cross-machine.test.mjs"
+    "tests/cross-machine.test.mjs",
+    "tests/defensive.test.mjs"
   ],
   "engines": {
     "dsh": ">=0.2.1-rc.5",
