@@ -26,10 +26,29 @@
 
 ## 二、安装
 
+### 从 GitHub 装（推荐）
+
 ```bash
-# 装进当前 profile（插件是组合包）
+# 装进指定 profile（插件是组合包）
+dsh plugin --profile <profile> add github:loveliveao/dsh-sync-hub
+
+# 锁定某个版本
+dsh plugin --profile <profile> add github:loveliveao/dsh-sync-hub#v0.5.0
+```
+
+### 从 npm 装
+
+```bash
+dsh plugin --profile <profile> add dsh-sync-hub
+```
+
+### 本地开发
+
+```bash
 dsh plugin --profile <profile> add file:D:\dsh-sync-hub
 ```
+
+源码仓库：<https://github.com/loveliveao/dsh-sync-hub>（MIT 许可证，零运行时依赖，只用 `node:*` 内置模块）。
 
 > `desktop` profile 由 Electron 独占管理，命令行装不进去（会报
 > `profile "desktop" is managed exclusively by the Electron application`）。
@@ -247,7 +266,7 @@ HTTP 接口（前缀 `/dsh-sync-hub`）：`GET /state`、`GET /status?remote=1`�
 ## 九、开发
 
 ```bash
-npm test                     # 一次跑完下面 11 个测试文件（node --test "tests/*.test.mjs"）
+npm test                     # 一次跑完 12 个测试文件（node --test 报 14 个顶层用例）
 node tests/smoke.mjs           # 无宿主冒烟：采集 → 推送 → 二次计划 → 伪造远端会话可拉取
 node tests/secrets.test.mjs    # 凭据开关：关闭时不上传，打开时只放行那 3 个已知文件
 node tests/transport.test.mjs  # 三种通道的检查步骤与「不泄漏令牌」
@@ -258,6 +277,7 @@ node tests/cross-machine.test.mjs  # 双机模拟：推送、拉取、冲突、�
 node tests/defensive.test.mjs      # 防御性：hub 异常不冒泡、apply 遇坏宿主不崩
 node tests/git-info.test.mjs       # 仓库信息：远端去凭据、分支、detached、异常降级
 node tests/archive.test.mjs        # 会话归档：只增不减、写盘前备份、失败降级
+node tests/archive-registry.test.mjs  # 归档走宿主注册表：宿主优先、失败回落文件
 node tests/plugin-config.test.mjs  # 插件配置解析：嵌套、行内注释、!!js、敏感键脱敏
 node tests/contract-endpoints.test.mjs  # /plugins 与 /workspaces 的字段形状
 ```

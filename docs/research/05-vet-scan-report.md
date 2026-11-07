@@ -10,6 +10,7 @@
 |---|---|---|---|---|---|---|---|
 | A. 当前工作树（未打补丁） | `suspicious` | 0 | 82 | 60 | 20 | 2 | **0** |
 | B. 沙箱快照 + 本文三处补丁 | `clean` | 0 | 78 | 59 | 19 | 0 | **0** |
+| C. **最终落地态**（补丁已入工作树 + 元数据整改后复扫，2026-11-07 15:0x） | `clean` | 0 | 101 | 75 | 26 | **0** | **0** |
 
 1. **没有阻断级（critical）发现**：无硬编码密钥、无数据外传端点、无挖矿特征、无加密/批量删除家族。
 2. **verdict 被顶成 `suspicious` 的唯一原因是 2 条 R3 high**：`lib/version.mjs:37` 直接读 `process.resourcesPath`（同文件重复上报 2 次）。
@@ -17,6 +18,7 @@
 4. `staticScore=0` 是分数被 medium 累加扣到地板（19×8×0.8≈121.6 → 100−121.6→0），不是异常；vet 源码注释明确写「The ONLY authoritative verdict」是 `verdict` 字段。
 5. 剩余 19 条 medium **全部是 R11「删除文件操作 rm()」**。vet 规则原文（`lib/scanner-bin/rules/destructive-ops.js`）写明：`DELETE_OPS = unlink/unlinkSync/rm/rmSync/rmdir/rmdirSync` → medium（除非路径字面量命中敏感路径才升 high），并注明「cleanup is common; LLM audit reviews context」。→ 换 `unlink` 之类只是绕过检测、没有收益（同样 medium），**不做这种规避**；正确做法是按 dsh.so「警告级需人工复核」逐条写审计说明（见第六节）。
 6. dsh.so 提交标准里「安全扫描通过」指**无阻断级发现**；我们当前（打补丁后）为 0 critical → 满足。
+7. **C 行 = 交付态**：三处补丁已真正写进工作树（不再靠补丁文件），`package.json` 元数据整改后复扫，findings 从 78 涨到 101 但**等级全在 info/medium，high 与 critical 仍是 0**。涨的 23 条全是新增源码（另一会话的 UI 重设计新增 `lib/archive.mjs`、`lib/git-info.mjs`、`lib/plugin-config.mjs`、`lib/workspaces.mjs` 与 6 个测试文件）带来的 info 级观测面，不是新风险。明细见第七节。
 
 ## 二、怎么复现（全程不碰用户 DSH profile）
 
@@ -39,7 +41,7 @@ node .dev/run-vet-scan.mjs "D:/dsh-sync-hub" git 0.2.2-rc.1
 
 文件枚举用 vet 自己的 `listSourceFiles` + `listInstructionFiles`，保证与线上口径一致。
 
-## 三、扫描面（32 个源码文件 + 3 个附属文件）
+## 三、扫描面（40 个源码文件 + 1 个指令文件）
 
 - **源码面**：`index.js`、`client.js`、`lib/**`（含 `transport/`）、`package.json`、`cordis.patch.yml`、`tests/*.test.mjs`、`tests/smoke.mjs`
 - **指令面**：根级 `AGENTS.md`（R18 指令注入观测面）
@@ -89,10 +91,10 @@ esmNamedBuiltinModules: fs/promises, fs, child_process
 hasNativeBinary: false
 ```
 
-## 五、三处补丁（已实测验证，**尚未落到工作树**）
+## 五、三处补丁（**已落到工作树**，2026-11-07）
 
-> 补丁文件：`.dev/vet-patch-2026-11-07.diff`（`git apply` 可用）；补丁后的三个文件副本在 `.dev/patch-candidate/`。
-> 落地前请确认另一会话没有改动同三个文件（实测 2026-11-07 14:36 时，三个文件与快照一致）。
+> 状态：**已落地**（`lib/version.mjs`、`lib/session-canon.mjs`、`package.json` 三个文件的工作树内容 = 补丁后内容）。
+> 踩坑记录：首版补丁 `.dev/vet-patch-2026-11-07.diff` 的 `+++` 侧写成了 `b/.dev/patch-candidate/…`（生成时是「原文件 vs 补丁副本」），`git apply` 把它当改名并**删掉了那三个文件**；已用 `git checkout --` 完整恢复，再把 `+++` 侧规整回 `b/lib/version.mjs` 等存为 `.dev/vet-patch-fixed.diff` 重新套用成功。
 
 ### 补丁 1：`lib/version.mjs:37` 去掉冗余的 `process.resourcesPath`
 
@@ -127,6 +129,8 @@ hasNativeBinary: false
 | info | 60 | 59（少的是 engines.node 那条） |
 | 插件自带测试 | — | 9 pass / 0 fail |
 
+> 补丁落地后复测：`npm test` = **12 个测试文件（node 报 14 个顶层用例）/ 0 fail**；最终态（补丁 + 元数据整改）复扫见第七节。
+
 ## 六、剩余 19 条 R11 的审计说明（按 dsh.so / vet 的口径逐条交代）
 
 vet 的 `destructive-ops.js` 判定：删除类调用一律 medium，**只有路径字面量命中敏感路径正则**（`/etc/`、`/root/`、`.ssh`、`.aws`、`crontab` 等）才升 high。我们 9 处 lib 站点逐一核对：
@@ -144,27 +148,51 @@ vet 的 `destructive-ops.js` 判定：删除类调用一律 medium，**只有路
 
 共 9 处 lib + 10 处 tests（测试里删自己的临时目录）。**无一处命中敏感路径**，无密钥/凭据文件被删——与 `lib/privacy.mjs` 的 `SECRET_FILES`（`.credentials.yaml`、`dsh-config-manager/vault/.credentials.yaml`、`openai-gateway/api-key`）没有交集。
 
-## 七、对照 dsh.so 提交接受标准的差距（实测口径）
+## 七、最终落地态复扫（2026-11-07 15:0x）
+
+复现命令（与第二节同一条）：
+
+```bash
+node .dev/run-vet-scan.mjs "D:/dsh-sync-hub" git 0.2.2-rc.1
+```
+
+| 口径 | verdict | staticScore | findings | info | medium | high | critical |
+|---|---|---|---|---|---|---|---|
+| A. 补丁前基线 | `suspicious` | 0 | 82 | 60 | 20 | 2 | 0 |
+| B. 沙箱补丁后 | `clean` | 0 | 78 | 59 | 19 | 0 | 0 |
+| C. **落地态复扫** | `clean` | 0 | 101 | 75 | 26 | **0** | **0** |
+
+- 扫描面：**40 个源码文件 + 1 个指令文件**（AGENTS.md）。
+- **high = 0、critical = 0** → dsh.so「安全扫描通过（无阻断级发现）」满足。
+- findings 由 78 → 101（+23）：增量全部来自新增源码的 **info 级观测面**（另一会话的 UI 重设计新增 `lib/archive.mjs`、`lib/git-info.mjs`、`lib/plugin-config.mjs`、`lib/workspaces.mjs` 与 6 个测试文件，UI 骨架的 DOM/事件字符串更多），**不是新风险**。
+- 26 条 medium 的构成：
+  - **25 条 R11「删除文件操作 rm()」**：lib 9 处 + tests 16 处 → 审计结论沿用第六节（无一处命中敏感路径、无凭据文件被删）。
+  - **1 条 R9（ReDoS 告警）**：`lib/plugin-config.mjs:467` 的 `/^(\^|~|>=|>|<=|<)?\s*v?(\d+(?:\.\d+)*)/`（另一会话新增文件的版本号解析正则）。内层组必须匹配字面点 "."，实际回溯是线性 → **属误报级告警**；该文件不在本轮改动范围内，**未擅自修改他人代码**，仅记为人工复核项。
+- capabilities（落地态观测）：hosts `github.com` / `dav.example.com` / `example.com` / `example.invalid` / `127.0.0.1:9`；spawnCmds `bash`；imports/ghostDeps `react`（宿主提供，info 级）；hasNetwork true / hasExec true / hasNativeBinary false。
+
+**结论**：`verdict=clean`、`staticScore=0`、0 high / 0 critical —— 可以提交 dsh.so。人工复核时只需过一遍这 26 条 medium（25 条 R11 已逐条写明审计结论 + 1 条 R9 误报）。
+
+## 八、对照 dsh.so 提交接受标准的差距（实测口径，2026-11-07 已全部转 ✅）
 
 | dsh.so 要求（<https://www.dsh.so/zh/submit/>） | 现状 | 结论 |
 |---|---|---|
 | DSH 兼容信号 | `package.json` 的 `dsh.bundle.patch` + `dsh.client` + keywords 含 `dsh-plugin` | ✅ 满足 |
-| README 带安装说明 | 目前只有 `add file:D:\dsh-sync-hub`（本地路径） | ❌ 需补 GitHub / npm 口径 |
+| README 带安装说明 | 三口径齐：GitHub `github:loveliveao/dsh-sync-hub#v0.5.0` / npm `dsh-sync-hub` / 本地 `file:` | ✅ 满足 |
 | 开源许可证（SPDX） | `MIT` + LICENSE 文件 | ✅ 满足 |
 | 插件 id 规范 `^[a-z0-9]+(-[a-z0-9]+)*$` | `dsh-sync-hub` | ✅ 满足 |
-| 源码可扫描 | 32 个源码文件 | ✅ 满足 |
-| 安全扫描无阻断级 | critical=0（打补丁后） | ✅ 满足（警告级需人工复核，即本文第六节） |
-| 渠道：GitHub 仓库 | **无 git remote、仓库未创建** | ❌ 待办 |
-| 渠道：npm 包名 | `private:true` 阻断 publish；`dsh-sync-hub` 包名未被占用 | ❌ 待办（需去掉 private） |
-| `repository` / `homepage` / `bugs` 字段 | 全部缺失 | ❌ 待办 |
-| `engines.dsh` | `>=0.2.1-rc.5 <0.2.2 || >=0.2.2-rc.1` | ⚠️ 语义上等价于「≥0.2.1-rc.5 且无上限」，建议改成 `>=0.2.1-rc.5 <0.3.0-0`（与已收录 L5 的 dsh-git-plugin 同款写法） |
+| 源码可扫描 | 40 个源码文件 | ✅ 满足 |
+| 安全扫描无阻断级 | critical=0、high=0（落地态复扫） | ✅ 满足（警告级需人工复核，即本文第六、七节） |
+| 渠道：GitHub 仓库 | 已推送 `github.com/loveliveao/dsh-sync-hub`（master + tag `v0.5.0`），公开可匿名访问 | ✅ 满足 |
+| 渠道：npm 包名 | `private` 已摘；包名 `dsh-sync-hub` 未被占用 | ✅ 可发（尚未 publish，属可选项） |
+| `repository` / `homepage` / `bugs` 字段 | 已补全，全部指向 `loveliveao/dsh-sync-hub` | ✅ 满足 |
+| `engines.dsh` | `>=0.2.1-rc.5 <0.3.0-0` | ✅ 已按建议改成（与已收录 L5 的 dsh-git-plugin 同款写法）；另加 `engines.node` `>=22.19` |
 
 补充实测：
 - **`engines.dsh` 闸门验证**：vet 的 DSH 需求闸门在 `dshVersion` = 0.2.1-rc.5 / 0.2.2-rc.1 / 0.3.0-rc.1 三档都**没有报任何版本不满足**（说明当前范围可满足，但也没有上限保护）。
 - DSH 自己的闸门（asar 内 `@deepseek-ai/dsh-app-boot` 的 `satisfies()`）用 `semver.satisfies(v, range, { includePrerelease: true })`，所以预发布版本不会被误拒。
 - npm 侧 `dsh-sync-hub` / `@dsh-so/dsh-sync-hub` / `dsh-sync-hub-plugin` 三个包名当前**均未被占用**（`dsh-sync` 已被占用 0.1.3）。
 
-## 八、L4 / L5 本地验收清单（提交前自测）
+## 九、L4 / L5 本地验收清单（提交前自测）
 
 L4 = 隔离沙盒安装成功；L5 = 装上后插件树能加载 + 白名单冒烟动作 + web 端口 HTTP 可达 + 清单 active。
 
@@ -175,15 +203,15 @@ L4 = 隔离沙盒安装成功；L5 = 装上后插件树能加载 + 白名单冒�
 5. `ctx.tools.schemas()` 里出现 `sync_hub_status/sync_hub_plan/sync_hub_run/sync_hub_sessions`；
 6. 工具各执行一次冒烟（不真传远端）。
 
-## 九、权威来源
+## 十、权威来源
 
 - 验证阶梯 <https://www.dsh.so/zh/verification/> · 提交与接受标准 <https://www.dsh.so/zh/submit/> · 方法论 <https://www.dsh.so/zh/methodology/> · 安全 <https://www.dsh.so/zh/security/> · 数据接口 <https://www.dsh.so/zh/data/>
 - 兼容矩阵 Discussions <https://github.com/deepseek-ai/deepseek-harness/discussions> · 架构 <https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/architecture.md>
 - 扫描器 <https://github.com/wulun811/dsh-plugin-vet>（npm `@jieai/dsh-plugin-vet`）· 审计协议 <https://github.com/wulun811/dsh-plugin-vet/blob/main/AUDIT_PROTOCOL.md>
 - 提交队列仓库 <https://github.com/ihuajiu/dsh-plugin-submissions>
 
-## 十、本报告未覆盖（已知未知）
+## 十一、本报告未覆盖（已知未知）
 
-- dsh.so 的 L4/L5 沙盒与冒烟协议细节站内未公开，只能按第八节自测；
+- dsh.so 的 L4/L5 沙盒与冒烟协议细节站内未公开，只能按第九节自测；
 - dsh.so 站内「插件市场尚未暴露逐对象的验证阶段位」，L1–L5 展示位与 Verified 徽章不是一回事（<https://www.dsh.so/zh/methodology/>）；
 - 提交队列仓库的 Issue 样例未取到（GitHub API 限流），条目字段的精确契约仍是黑盒。

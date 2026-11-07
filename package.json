@@ -2,7 +2,6 @@
   "name": "dsh-sync-hub",
   "version": "0.5.0",
   "description": "同步多台电脑上的 DSH 配置与会话：可选的同步范围、三种传输通道、冲突检测与回滚。",
-  "private": true,
   "type": "module",
   "main": "index.js",
   "exports": {
@@ -21,6 +20,7 @@
     "!lib/**/*.test.mjs",
     "locale",
     "README.md",
+    "LICENSE",
     "docs",
     "tests/smoke.mjs",
     "tests/secrets.test.mjs",
@@ -32,8 +32,8 @@
     "tests/defensive.test.mjs"
   ],
   "engines": {
-    "dsh": ">=0.2.1-rc.5 <0.2.2 || >=0.2.2-rc.1",
-    "node": ">=20"
+    "dsh": ">=0.2.1-rc.5 <0.3.0-0",
+    "node": ">=22.19"
   },
   "dependencies": {},
   "dsh": {
@@ -63,12 +63,22 @@
     "developer-tools",
     "settings-backup"
   ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/loveliveao/dsh-sync-hub.git"
+  },
+  "bugs": {
+    "url": "https://github.com/loveliveao/dsh-sync-hub/issues"
+  },
+  "homepage": "https://github.com/loveliveao/dsh-sync-hub#readme",
   "license": "MIT",
   "icon": "./icon.svg",
   "scripts": {
-    "test": "node --test \"tests/*.test.mjs\""
+    "test": "node --test \"tests/*.test.mjs\"",
+    "prepublishOnly": "npm test"
   },
   "author": {
-    "name": "dsh-sync-hub contributors"
+    "name": "loveliveao",
+    "url": "https://github.com/loveliveao"
   }
 }
