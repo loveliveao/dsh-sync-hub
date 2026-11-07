@@ -109,11 +109,11 @@
 <profile>/
 ├─ local-plugins/dsh-sync-hub   → Junction → D:\dsh-sync-hub   （插件本体，hmr 监听此目录）
 ├─ node_modules/dsh-sync-hub     → Junction → D:\dsh-sync-hub   （宿主解析入口）
-└─ cordis.patch.yml              → hmr 条目：base=ctx.get("profileContext").dir, root=[local-plugins]
+└─ cordis.patch.yml              → 用户配置，**当前不含 hmr 条目**（见下）
 ```
 
 - profile `package.json` / `pnpm-lock.yaml`：`"dsh-sync-hub": "file:local-plugins/dsh-sync-hub"`。
-- **需要重启 DSH 一次**才能让 hmr 建立 watcher（改动 hmr 条目时运行实例已启动）；重启后改工作区源码即自动热重载。
+- **热重载当前未启用**：base bundle 里的 `dsh-hmr` 配置是 `root: []`（官方语义 = 只监视配置文件，不监视模块源码），所以改工作区源码不会自动重载。按 `AGENTS.md` 规则 ①（禁止改动用户 DSH 配置），**由用户自己**在 profile `cordis.patch.yml` 加一条 `- id: hmr` 且 `config.root: [local-plugins]` 才生效，且需重启 DSH 一次建立 watcher。
 - 坑：**不要再对工作区跑 `sync_plugin` write=true**——会把文件拷进 junction 目标（写脏仓库），并把 junction 变成真实目录。
 - 插件 HTTP 路由带前缀：`/dsh-sync-hub`（`lib/server.mjs:2` 的 `PREFIX`），探测 `/state` 会 404，属正常。
 
@@ -122,7 +122,7 @@
 ## 六、活实例现状
 
 - 插件 0.4.0 / DSH 0.2.2-rc.1（desktop profile）/ node 24.21.0 / 设备 `HUAWEI(28cd59f9)` / `DSH_HOME=C:\Users\HUAWEI\.dsh`
-- webServer 仅监听 `127.0.0.1:1900`（局域网不可达，这点是好的）
+- webServer 仅监听 `127.0.0.1:<随机高位端口>`（局域网不可达，这点是好的）。**端口每次重启都会变**：实测 1900 → 13180 → 53252 → 36194，探测时不要写死端口，要从运行上下文取。
 - 通道 `local`，但 `remote.path` 为空 → **从未执行过一次同步**（`base={}`、`lastPlan=null`、`lastSync=null`）
 - 本机 56 条目 / 37MB：cordis 2、plugins 1、skills 1、sessions 52（另 55 个会话共 36.9MB）
 - `~/.dsh/sync-hub/` 下只有 `state.json`(892B)，无 `backups/`、无 `remote-git/`
@@ -143,3 +143,32 @@
 8. P2 / P3 按需
 
 **回归用例建议覆盖**：链接逃逸、全大写密钥、`aws_*` 键名、块标量、单行 JSON、尾逗号、profile 穿越、备份契约往返、重复同步幂等（连跑两次 pulled 应为 0）。
+---
+
+## 八、防御性加固与运行态复验（2026-11-07）
+
+依据 `AGENTS.md` 两条硬规则：① 禁止修改可能影响 DSH 的配置；② 插件任何情况下都不能让用户的 DSH 崩溃。
+
+### 8.1 修复前的冒泡点（审查结论）
+
+- `lib/tools.mjs` 4 个 `execute()` 直接 `await hub.status()/plan()/run()/sessions()`，**无 try/catch** → hub 抛错会冒泡给宿主工具执行器。
+- `index.js` 的 `new Hub(ctx, {...})` 在 `apply()` 内**无保护** → 构造抛错会让插件加载失败；两个 `ctx.effect(...)` 回调同样无保护。
+- `lib/hub.mjs` 的 `plan()/run()` 里 `this.context()` / `this.versionInfo()` 在 try 之外 → 抛错时 promise reject。
+
+（`lib/server.mjs` 的 HTTP handler 早已整体被 try/catch 包住 → HTTP 面原本就是安全的。）
+
+### 8.2 修复（提交 c16c5ab，7 文件 +358/-28）
+
+- `lib/tools.mjs`：新增 `safeExecute(name, fn)`，异常统一转成 `{ text: '[sync-hub] <name> 失败：<msg>' }`，4 个工具全部改用它。
+- `index.js`：`new Hub(...)` 包 try/catch，失败降级到 `degradedHub(...)`；两个 `ctx.effect` 回调各自 try/catch，失败返回 noop disposer。
+- `lib/degraded.mjs`（新）：降级 Hub —— 读接口（status/sessions/analysis/workspaces/backups/test/plan/run）全部返回结构化结果不抛异常；写接口（saveSettings/setSecret）抛可读错误，由 server 的 catch 转 500。
+- `lib/hub.mjs`：`plan()/run()` 的 `context()` / `versionInfo()` 移入 try；transport 在 finally 里 `dispose().catch(() => {})`。
+- `tests/defensive.test.mjs`（新）：4 组用例 —— hub 抛错时 4 个工具不 reject；降级 Hub 读接口不抛、写接口抛可读错；宿主 webServer/tools 注册抛异常时 `apply()` 与卸载都不抛；正常宿主下 `apply()` 注册 1 条 HTTP 路由 + 4 个工具。
+
+### 8.3 验证（实测）
+
+- **8 个测试文件全部 exit 0**：smoke / secrets / transport / git-guard / analysis / session-canon / cross-machine / defensive。
+- **隔离环境跑新代码**（minihost，不碰用户主实例）：`GET /dsh-sync-hub/state` 200、`GET /dsh-sync-hub/sessions` 200、非法 JSON → 500 `{"ok":false,"error":"请求体不是合法 JSON"}`、`POST /dsh-sync-hub/plan` → 500 `{"ok":false,"error":"还没有设置同步文件夹路径"}`、未知路由 → 404 —— 全是结构化降级，无崩溃。
+- **用户主实例重启后复验**（端口 36194，DSH 进程 11:58:20 启动，晚于提交时间）：`GET /dsh-sync-hub/state` 200（plugin 0.4.0 / DSH 0.2.2-rc.1）、`GET /dsh-sync-hub/sessions` 200、`POST /dsh-sync-hub/plan` → 500 `{"ok":false,"error":"还没有设置同步文件夹路径"}`；工具层 `sync_hub_status` / `sync_hub_plan` / `sync_hub_sessions` 三个均正常返回（plan 走的是「计划失败：还没有设置同步文件夹路径」这条优雅失败路径）。
+- **用户 DSH 配置未被本轮改动**：`C:\Users\HUAWEI\.dsh\profiles\desktop\cordis.patch.yml` 不含 hmr 条目，LastWriteTime 仍是 11:51:58（即撤销时刻），此后所有操作都是只读或仓库内改动。
+
