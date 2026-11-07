@@ -172,3 +172,27 @@
 - **用户主实例重启后复验**（端口 36194，DSH 进程 11:58:20 启动，晚于提交时间）：`GET /dsh-sync-hub/state` 200（plugin 0.4.0 / DSH 0.2.2-rc.1）、`GET /dsh-sync-hub/sessions` 200、`POST /dsh-sync-hub/plan` → 500 `{"ok":false,"error":"还没有设置同步文件夹路径"}`；工具层 `sync_hub_status` / `sync_hub_plan` / `sync_hub_sessions` 三个均正常返回（plan 走的是「计划失败：还没有设置同步文件夹路径」这条优雅失败路径）。
 - **用户 DSH 配置未被本轮改动**：`C:\Users\HUAWEI\.dsh\profiles\desktop\cordis.patch.yml` 不含 hmr 条目，LastWriteTime 仍是 11:51:58（即撤销时刻），此后所有操作都是只读或仓库内改动。
 
+### 8.4 热重载启用（2026-11-07 12:08，用户授权后由 agent 代改）
+
+- **改动文件**：`C:\Users\HUAWEI\.dsh\profiles\desktop\cordis.patch.yml`（**用户配置**）。本次是经用户明确同意（m00796「你直接帮我改了」）才写入的 —— 此前对同一文件的改动全部由 agent 自行撤销。
+- **备份**：`C:\Users\HUAWEI\.dsh\plugin-backups\20261107\cordis.patch.yml.pre-hmr-1208.bak`（6655B，字节级复制，与改前完全一致）。
+- **追加内容**（文件末尾第 261 行起，LF、无 BOM）：
+
+  ```yaml
+  - id: hmr
+    name: '@deepseek-ai/dsh-hmr'
+    config:
+      root:
+        - local-plugins
+      debounce: 300
+      ignored:
+        - '**/node_modules/**'
+        - '**/.git/**'
+        - '**/.dev/**'
+  ```
+
+- **依据**：base bundle `@deepseek-ai/dsh-base` 的 `cordis.patch.yml` 本就带 `- id: hmr`（`config.root: []`，官方注释「模块监听是 opt-in」），且该文件头写明「后续 bundle patch 与用户 profile `cordis.patch.yml` 按 id 定位同一行，后者**整块替换** `config`」；官方 README 要求**在启动前**通过 profile patch 配置这一行。同 bundle 已有 `- id: timer`，所以不需要额外加 timer 条目。
+- **校验**：js-yaml 与 yaml(eemeli) 双解析器均解析成功 → 17 条顶层条目、末条 `id=hmr` / `root=["local-plugins"]` / `debounce=300`、无重复 id；文件保持 LF、无 BOM、未引入 `!!js` 标签。
+- **实测**：写入后运行实例仍在线（端口 36194，`GET /dsh-sync-hub/state` → 200，版本 0.4.0）。活体探针（临时把 `package.json` 版本改成 `0.4.1-hmrprobe`）**60s 内 `/state` 版本始终是 0.4.0** → 该行要**下次启动**才被 hmr 服务采用，与官方「启动前配置」一致。探针已还原（`package.json` 回到 0.4.0，git 干净）。
+- **待办**：需要重启一次 DSH 才生效；重启后再跑一次同样的版本探针即可确认热重载真的通了。
+
