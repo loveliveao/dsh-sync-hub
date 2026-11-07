@@ -166,8 +166,41 @@ window.__ModuleLoader__.load({
       analysisNoData: '没有数据',
       analysisErrors: '部分项目读取失败',
 
+      treeTitle: '这台机器现在怎么样',
+      treeCard: '本机现状',
+      treeIntro: '按工作区列出本机的插件、技能与会话，展开可以看到每条会话会不会被同步。',
+      treeRun: '读取本机清单',
+      treeLoading: '读取中…',
+      treeError: '读取失败',
+      treeEmpty: '没有找到工作区或会话',
+      treeWs: '工作区',
+      treeSessions: '会话',
+      treeSynced: '已同步',
+      treeChanged: '有改动',
+      treeOff: '不同步',
+      treePending: '待推送',
+      treeUnassigned: '未归属工作区',
+      treePlugins: '插件',
+      treeSkills: '技能',
+      wsOn: '同步这个工作区',
+      wsOff: '不同步这个工作区',
+      wsNoSessions: '这个工作区下还没有会话',
+      wsUnassignedHint: '这些会话的目录不在任何已注册工作区里，仍然可以同步；在「同步范围」里可以手动指定它属于哪个工作区。',
+      syncOff: '不同步',
+      syncSynced: '已同步',
+      syncChanged: '有改动',
+      syncPending: '待推送',
+      wsMapTitle: '跨机目录映射',
+      wsMapHint: '同一台工作区在另一台电脑上的路径可能不同。填了之后，同步过来的会话会被记成这个目录；留空表示按目录名自动匹配。',
+      wsMapPlaceholder: '本机路径，例如 D:\\Code\\VibeCoding',
+      wsMapSave: '记住这个映射',
+      wsMapSaved: '已记住',
+
       privacyTitle: '隐私',
       privacyBody: '同步的是「配置 + 会话」，不会碰浏览器本地设置。默认不带走任何密钥；需要跨机登录时，可以在「同步范围」里手动打开凭据开关。',
+      pushSync: '推送同步',
+      wsScopeTitle: '按工作区分别同步',
+      wsScopeHint: '关掉某个工作区，它的会话就不会被同步；插件、技能、配置不受影响。',
     };
 
     const EN = {
@@ -307,8 +340,41 @@ window.__ModuleLoader__.load({
       analysisNoData: 'no data',
       analysisErrors: 'Some items failed to read',
 
+      treeTitle: 'How this machine looks',
+      treeCard: 'Local machine',
+      treeIntro: 'Lists local plugins, skills and sessions grouped by workspace — expand one to see whether each session will be synced.',
+      treeRun: 'Read local inventory',
+      treeLoading: 'Reading…',
+      treeError: 'Failed to read',
+      treeEmpty: 'No workspace or session found',
+      treeWs: 'Workspaces',
+      treeSessions: 'Sessions',
+      treeSynced: 'Synced',
+      treeChanged: 'Changed',
+      treeOff: 'Not synced',
+      treePending: 'To push',
+      treeUnassigned: 'Unassigned workspaces',
+      treePlugins: 'Plugins',
+      treeSkills: 'Skills',
+      wsOn: 'Sync this workspace',
+      wsOff: 'Do not sync this workspace',
+      wsNoSessions: 'No session under this workspace yet',
+      wsUnassignedHint: 'These sessions live in a folder that is not a registered workspace. They still sync; in "What to sync" you can point them at a workspace.',
+      syncOff: 'Not synced',
+      syncSynced: 'Synced',
+      syncChanged: 'Changed',
+      syncPending: 'Pending',
+      wsMapTitle: 'Cross-machine path mapping',
+      wsMapHint: 'The same workspace may live under a different path on another computer. Set it here and incoming sessions are recorded against that folder; leave empty to match by folder name.',
+      wsMapPlaceholder: 'Local path, e.g. D:\\Code\\VibeCoding',
+      wsMapSave: 'Remember this mapping',
+      wsMapSaved: 'Remembered',
+
       privacyTitle: 'Privacy',
       privacyBody: 'What travels is config + sessions; browser-local settings are never touched. No secret leaves the machine unless you turn the credential switch on in "What to sync".',
+      pushSync: 'Push & sync',
+      wsScopeTitle: 'Sync per workspace',
+      wsScopeHint: 'Turning off a workspace keeps its sessions local. Plugins, skills and config are unaffected.',
     };
 
     /* ---------- 2. 主题与小工具 ---------- */
@@ -433,6 +499,8 @@ window.__ModuleLoader__.load({
         plan: null,
         analysis: null,
         analysisLoading: false,
+        tree: null,
+        treeLoading: false,
         check: null,
       },
       listeners: new Set(),
@@ -599,6 +667,40 @@ window.__ModuleLoader__.load({
         } finally {
           store.set({ analysisLoading: false });
         }
+      },
+      /** 工作区树：工作区 → 会话，每条带「是否同步」。 */
+      async loadTree() {
+        store.set({ treeLoading: true });
+        try {
+          const res = await getJson(`${PREFIX}/workspaces`);
+          if (!res || !res.ok) throw new Error((res && res.error) || 'failed');
+          store.set({ tree: res.data });
+        } catch (err) {
+          store.set({ tree: { error: String((err && err.message) || err) } });
+        } finally {
+          store.set({ treeLoading: false });
+        }
+      },
+      /** 开关某个工作区的同步。key 是工作区目录名。 */
+      async toggleWorkspace(key, enabled) {
+        const draft = JSON.parse(JSON.stringify(store.state.draft || {}));
+        draft.workspaces = {
+          ...(draft.workspaces || {}),
+          switches: { ...((draft.workspaces || {}).switches || {}), [key]: enabled },
+        };
+        await actions.saveNow(draft);
+        await actions.loadTree();
+      },
+      /** 记住跨机目录映射：目录名 → 本机路径。空字符串表示清除。 */
+      async setWorkspaceMap(key, path) {
+        const draft = JSON.parse(JSON.stringify(store.state.draft || {}));
+        const map = { ...((draft.workspaces || {}).map || {}) };
+        const value = String(path || '').trim();
+        if (value) map[key] = value;
+        else delete map[key];
+        draft.workspaces = { ...(draft.workspaces || {}), map };
+        await actions.saveNow(draft);
+        await actions.loadTree();
       },
     };
 
@@ -1096,6 +1198,174 @@ window.__ModuleLoader__.load({
 
     /* ---------- 6. 配置中心：概览 / 同步范围 / 传输通道 ---------- */
 
+    /** 一行会话：标题 + 路径 + 最右侧的「是否同步」标签。 */
+    function SessionRow({ s, t }) {
+      const state = s.sync;
+      const color = state === 'off' ? C.dimmed : state === 'synced' ? C.ok : state === 'changed' ? C.warn : C.brand;
+      const label =
+        state === 'off' ? (s.reason || t('syncOff'))
+          : state === 'synced' ? t('syncSynced')
+            : state === 'changed' ? t('syncChanged')
+              : t('syncPending');
+      const name = s.title || s.sessionId.slice(0, 8);
+      return h(
+        'div',
+        {
+          key: s.sessionId,
+          style: {
+            display: 'flex',
+            gap: 8,
+            alignItems: 'center',
+            fontSize: 11,
+            padding: '3px 0',
+            paddingLeft: 14,
+          },
+        },
+        h(
+          'span',
+          { style: { flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } },
+          name,
+          h('span', { style: { color: C.dimmed, marginLeft: 6 } }, s.cwd || s.rel),
+        ),
+        h('span', { style: { color: C.dimmed, flex: '0 0 auto' } }, fmtBytes(s.bytes || 0)),
+        h(Badge, { text: label, color }),
+      );
+    }
+
+    /** 一个工作区：标题行（含开关与会话数）+ 可展开的会话列表。 */
+    function WorkspaceGroup({ ws, hub, t, muted }) {
+      const [open, setOpen] = React.useState(false);
+      const sessions = ws.sessions || [];
+      return h(
+        'div',
+        { style: { borderTop: `1px solid ${C.separator}`, padding: '7px 0' } },
+        h(
+          'div',
+          { style: { display: 'flex', gap: 8, alignItems: 'center' } },
+          h(
+            'button',
+            {
+              onClick: () => setOpen(!open),
+              style: {
+                flex: 1,
+                minWidth: 0,
+                display: 'flex',
+                gap: 8,
+                alignItems: 'center',
+                border: 'none',
+                background: 'transparent',
+                color: 'inherit',
+                font: 'inherit',
+                fontSize: 12,
+                cursor: 'pointer',
+                textAlign: 'left',
+                padding: 0,
+              },
+            },
+            h('span', { style: { color: C.dim, transform: open ? 'rotate(90deg)' : 'none', transition: 'transform .12s', display: 'inline-block' } }, '›'),
+            h('span', { style: { fontWeight: 600 } }, ws.title || ws.key),
+            h('span', { style: { fontSize: 11, color: C.dim } }, ws.path || ''),
+            h(Badge, { text: `${sessions.length} ${t('count')}` }),
+            h(Badge, { text: fmtBytes(ws.bytes || 0) }),
+          ),
+          h(
+            Switch,
+            {
+              on: ws.enabled !== false,
+              onChange: (next) => hub.actions.toggleWorkspace(ws.key, next),
+              title: ws.enabled !== false ? t('wsOn') : t('wsOff'),
+            },
+          ),
+        ),
+        muted
+          ? null
+          : null,
+        open
+          ? h(
+              'div',
+              { style: { maxHeight: 260, overflow: 'auto', marginTop: 4 } },
+              sessions.length === 0
+                ? h(Empty, null, t('wsNoSessions'))
+                : sessions.map((s) => h(SessionRow, { key: s.sessionId, s, t })),
+            )
+          : null,
+      );
+    }
+
+    /** 本机现状：工作区 → 会话，可展开；下面还有插件和技能清单。 */
+    function MachineTree({ hub, t }) {
+      const tree = hub.tree;
+      if (!tree) return null;
+      if (tree.error) return h(Banner, { kind: 'error' }, `${t('treeError')}: ${tree.error}`);
+      const groups = tree.workspaces || [];
+      const unassigned = tree.unassigned || [];
+      const totals = tree.totals || {};
+      return h(
+        'div',
+        null,
+        h(
+          'div',
+          { style: { display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8 } },
+          h(Badge, { text: `${t('treeWs')} ${totals.workspaces ?? 0}`, color: C.brand }),
+          h(Badge, { text: `${t('treeSessions')} ${totals.sessions ?? 0}` }),
+          h(Badge, { text: fmtBytes(totals.bytes || 0) }),
+          h(Badge, { text: `${t('treeSynced')} ${totals.synced ?? 0}`, color: C.ok }),
+          h(Badge, { text: `${t('treeChanged')} ${totals.changed ?? 0}`, color: C.warn }),
+          h(Badge, { text: `${t('treePending')} ${totals.pending ?? 0}`, color: C.brand }),
+          h(Badge, { text: `${t('treeOff')} ${totals.off ?? 0}` }),
+        ),
+        groups.length === 0 && unassigned.length === 0
+          ? h(Empty, null, t('treeEmpty'))
+          : null,
+        groups.map((ws) => h(WorkspaceGroup, { key: `ws:${ws.key}`, ws, hub, t })),
+        unassigned.length
+          ? h(
+              'div',
+              { style: { marginTop: 8 } },
+              h(
+                'div',
+                { style: { fontSize: 11, fontWeight: 600, color: C.dim, marginBottom: 2 } },
+                t('treeUnassigned'),
+              ),
+              h(
+                'div',
+                { style: { fontSize: 11, color: C.dimmed, marginBottom: 4, lineHeight: 1.55 } },
+                t('wsUnassignedHint'),
+              ),
+              unassigned.map((ws) => h(WorkspaceGroup, { key: `un:${ws.key}`, ws, hub, t })),
+            )
+          : null,
+        (tree.plugins || []).length
+          ? h(
+              'div',
+              { style: { marginTop: 10 } },
+              h('div', { style: { fontSize: 11, fontWeight: 600, color: C.dim, marginBottom: 3 } }, t('treePlugins')),
+              h(
+                'div',
+                { style: { display: 'flex', gap: 6, flexWrap: 'wrap' } },
+                (tree.plugins || []).map((p) =>
+                  h(Badge, { key: p.name, text: `${p.name}${p.version ? ` ${p.version}` : ''}` }),
+                ),
+              ),
+            )
+          : null,
+        (tree.skills || []).length
+          ? h(
+              'div',
+              { style: { marginTop: 8 } },
+              h('div', { style: { fontSize: 11, fontWeight: 600, color: C.dim, marginBottom: 3 } }, t('treeSkills')),
+              h(
+                'div',
+                { style: { display: 'flex', gap: 6, flexWrap: 'wrap' } },
+                (tree.skills || []).map((s) =>
+                  h(Badge, { key: s.name, text: `${s.name} · ${s.files} ${t('count')} · ${fmtBytes(s.bytes || 0)}` }),
+                ),
+              ),
+            )
+          : null,
+      );
+    }
+
     function AnalysisBlock({ hub, t }) {
       const a = hub.analysis;
       const loading = hub.analysisLoading;
@@ -1222,6 +1492,10 @@ window.__ModuleLoader__.load({
     function OverviewTab({ hub, t }) {
       const status = hub.status;
       const draft = hub.draft;
+      React.useEffect(() => {
+        if (!hub.tree && !hub.treeLoading) hub.actions.loadTree();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+      }, []);
       if (!status || !draft) return null;
       const plan = hub.plan || status.lastPlan;
       return h(
@@ -1230,16 +1504,36 @@ window.__ModuleLoader__.load({
         h(
           Card,
           {
-            title: t('analysisCard'),
+            title: t('treeCard'),
             extra: h(Badge, { text: `${status.local?.entries || 0} ${t('entries')}` }),
           },
-          h(Collapsible, {
-            title: t('analysisTitle'),
-            meta: status.bytesLabel || fmtBytes(status.local?.bytes || 0),
-            onOpen: () => {
-              if (!hub.analysis && !hub.analysisLoading) hub.actions.loadAnalysis();
+          h(
+            'div',
+            { style: { fontSize: 11, color: C.dim, marginBottom: 6, lineHeight: 1.55 } },
+            t('treeIntro'),
+          ),
+          hub.treeLoading && !hub.tree ? h(Empty, null, t('treeLoading')) : null,
+          !hub.treeLoading && !hub.tree
+            ? h(Button, { onClick: () => hub.actions.loadTree() }, t('treeRun'))
+            : null,
+          hub.tree ? h(MachineTree, { hub, t }) : null,
+          h(
+            Collapsible,
+            {
+              title: t('analysisTitle'),
+              meta: hub.analysis && !hub.analysis.error ? fmtBytes(hub.analysis.totals?.bytes || 0) : null,
+              onOpen: () => {
+                if (!hub.analysis && !hub.analysisLoading) hub.actions.loadAnalysis();
+              },
             },
-          }, h(AnalysisBlock, { hub, t })),
+            h(AnalysisBlock, { hub, t }),
+          ),
+          h(
+            'div',
+            { style: { display: 'flex', gap: 8, marginTop: 10 } },
+            h(Button, { primary: true, onClick: hub.actions.run, busy: hub.busy === 'run' }, hub.busy === 'run' ? t('running') : t('pushSync')),
+            h(Button, { onClick: () => hub.actions.loadTree() }, t('treeRun')),
+          ),
         ),
         h(
           Card,
@@ -1299,11 +1593,46 @@ window.__ModuleLoader__.load({
       );
     }
 
+    /** 跨机目录映射：一行输入框，填了就记住。 */
+    function WorkspaceMapRow({ hub, t, ws }) {
+      const draft = hub.draft || {};
+      const saved = (draft.workspaces && draft.workspaces.map && draft.workspaces.map[ws.key]) || '';
+      const [value, setValue] = React.useState(saved);
+      React.useEffect(() => setValue(saved), [saved]);
+      const [savedTick, setSavedTick] = React.useState(false);
+      const submit = async () => {
+        await hub.actions.setWorkspaceMap(ws.key, value);
+        setSavedTick(true);
+        setTimeout(() => setSavedTick(false), 2500);
+      };
+      return h(
+        'div',
+        { style: { marginTop: 6 } },
+        h(
+          'div',
+          { style: { fontSize: 11, color: C.dimmed, marginBottom: 3 } },
+          t('wsMapHint'),
+        ),
+        h(
+          'div',
+          { style: { display: 'flex', gap: 6, alignItems: 'center' } },
+          h(TextInput, {
+            value,
+            placeholder: t('wsMapPlaceholder'),
+            onChange: (v) => setValue(v),
+            style: { flex: 1, minWidth: 0 },
+          }),
+          h(Button, { small: true, onClick: submit, busy: hub.busy === 'save' }, savedTick ? t('wsMapSaved') : t('wsMapSave')),
+        ),
+      );
+    }
+
     function ScopeTab({ hub, t }) {
       const status = hub.status;
       const draft = hub.draft;
       React.useEffect(() => {
         if (hub.sessions === null && hub.busy !== 'sessions') hub.actions.loadSessions();
+        if (!hub.tree && !hub.treeLoading) hub.actions.loadTree();
         // eslint-disable-next-line react-hooks/exhaustive-deps
       }, []);
       if (!status || !draft) return null;
@@ -1381,6 +1710,91 @@ window.__ModuleLoader__.load({
               ),
             );
           }),
+        ),
+        h(
+          Card,
+          { title: t('wsScopeTitle') },
+          h('div', { style: { fontSize: 11, color: C.dim, marginBottom: 6, lineHeight: 1.55 } }, t('wsScopeHint')),
+          !hub.tree
+            ? h(Button, { onClick: () => hub.actions.loadTree() }, t('treeRun'))
+            : null,
+          hub.tree
+            ? h(
+                'div',
+                null,
+                (hub.tree.workspaces || []).map((ws) =>
+                  h(
+                    'div',
+                    {
+                      key: `sc:${ws.key}`,
+                      style: {
+                        display: 'flex',
+                        gap: 10,
+                        alignItems: 'flex-start',
+                        padding: '8px 0',
+                        borderBottom: `1px solid ${C.separator}`,
+                      },
+                    },
+                    h(Switch, {
+                      on: ws.enabled !== false,
+                      onChange: (next) => hub.actions.toggleWorkspace(ws.key, next),
+                    }),
+                    h(
+                      'div',
+                      { style: { flex: 1, minWidth: 0 } },
+                      h(
+                        'div',
+                        { style: { display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' } },
+                        h('span', { style: { fontSize: 12, fontWeight: 600 } }, ws.title || ws.key),
+                        h(Badge, { text: `${(ws.sessions || []).length} ${t('count')}` }),
+                        h(Badge, { text: fmtBytes(ws.bytes || 0) }),
+                      ),
+                      h('div', { style: { fontSize: 11, color: C.dim, marginTop: 2 } }, ws.path || ''),
+                      h(WorkspaceMapRow, { hub, t, ws }),
+                    ),
+                  ),
+                ),
+                (hub.tree.unassigned || []).length
+                  ? h(
+                      'div',
+                      { style: { marginTop: 8 } },
+                      h('div', { style: { fontSize: 11, fontWeight: 600, color: C.dim, marginBottom: 3 } }, t('treeUnassigned')),
+                      h('div', { style: { fontSize: 11, color: C.dimmed, lineHeight: 1.55 } }, t('wsUnassignedHint')),
+                      (hub.tree.unassigned || []).map((ws) =>
+                        h(
+                          'div',
+                          {
+                            key: `scu:${ws.key}`,
+                            style: {
+                              display: 'flex',
+                              gap: 10,
+                              alignItems: 'flex-start',
+                              padding: '8px 0',
+                              borderTop: `1px solid ${C.separator}`,
+                            },
+                          },
+                          h(Switch, {
+                            on: ws.enabled !== false,
+                            onChange: (next) => hub.actions.toggleWorkspace(ws.key, next),
+                          }),
+                          h(
+                            'div',
+                            { style: { flex: 1, minWidth: 0 } },
+                            h(
+                              'div',
+                              { style: { display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' } },
+                              h('span', { style: { fontSize: 12, fontWeight: 600 } }, ws.title || ws.key),
+                              h(Badge, { text: `${(ws.sessions || []).length} ${t('count')}` }),
+                            ),
+                            h('div', { style: { fontSize: 11, color: C.dim, marginTop: 2 } }, ws.path || ''),
+                            h(WorkspaceMapRow, { hub, t, ws }),
+                          ),
+                        ),
+                      ),
+                    )
+                  : null,
+              )
+            : null,
         ),
         h(
           Card,
