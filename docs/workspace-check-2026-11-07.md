@@ -242,14 +242,30 @@
 - `lib/sections.mjs`：`collectCustom` 对 `.yml/.json/.env/.ini/.toml` 文本配置脱敏后入集合，并打 `meta:{kind:'redacted'}`；目录分支经 `collectTree` 新增的 `transform`/`metaFor` 逐文件处理。
 - `lib/engine.mjs`：`pullEntry` 保留 `meta.kind==='redacted'`（原来只保留 `session`，标记在拉取途中被丢）；`writeEntry` 按 `entry.meta.kind` 走 `mergeRedactedText` —— **以远端文本为骨架，`<redacted>` 的行用本机同名键的真实值回填，本机没有该键则丢弃该行**。
 - 额外补一条：**本机没有这个文件时，不写远端那份脱敏副本**（否则用户拿到的是一份写着 `<redacted>` 的假配置）；计划里以 `skipped` 列出并给出原因。
-- 与原报告修法的差异：原 P0-3 建议「给 `SECTION_DEFS` 补 custom」。**这里没有这样做** —— `custom` 分区由 `settings.customPaths` 单独控制，本来就不是用户开关位；补进 `SECTION_DEFS` 会平白多出一个设置项并改掉设置 schema。合并语义与 cordis 一致，但入口不同。
+- 关于 `custom` 分区（与原报告修法的差异，**2026-11-07 16:50 定稿**）：原 P0-3 建议「给 `SECTION_DEFS` 补 custom」。最终**采纳了**，但语义收紧成三句话：
+  1. `custom` 进分区模型（`SECTION_DEFS` 里 `default:false`、`kind:'redacted'`）—— 快照、设备记录、计划门禁都按「分区 id」统一走一遍，模型里没有 `custom` 就得在每个地方开特例；
+  2. **设置页不出现这个开关**（前端同步范围页显式过滤 `custom`，自定义路径另有专门分组），`settings.sections.custom` 也不写入设置 schema —— 不给用户平白多一个开关位；
+  3. **真正的开关仍是 `settings.customPaths`**（`customEnabled(settings)`：里面有启用项就是开），`settingsSections()` 里 `custom` 的默认值恒为 false，只用于「分区列表里要出现 custom 这一行」。
 
 ### 9.4 验证（实测）
 
-- 全量：**14 个测试文件逐个 `node` 直跑全部 exit=0**（含新增 `tests/security.test.mjs` 20 项断言、`tests/p0-sync-safety.test.mjs` 26 项断言）。
+- 全量：**17 个测试文件逐个 `node` 直跑全部 exit=0**，`node --test "tests/*.test.mjs"` 整体也 exit=0（含新增 `tests/security.test.mjs` 20 项断言、`tests/p0-sync-safety.test.mjs` 26 项断言、`tests/section-model.test.mjs` 26 项断言、`tests/custom-section.test.mjs`、`tests/state-baseline.test.mjs`）。
 - **负向对照**（关键一步）：把 `lib/state.mjs`、`lib/engine.mjs`、`lib/sections.mjs` 在**临时副本**里回退到修复前的 HEAD 版本，再跑 `p0-sync-safety.test.mjs` → **exit=1**，复现出原始症状：
   - B 的真实密钥 `sk-bbbbbbbbbbbbbbbb` 被 `<redacted>` 顶掉（文件内容变成 `api_key: <redacted>`）；
   - 本机没有的文件被生成为占位文件（`custom/only-a.yml` 里写着 `<redacted>`）；
   - `saveState` → `loadState` 后 `ignoreAfterPull` 直接消失（状态白名单丢字段）。
   → 说明测试确实咬住了 bug，而不是对着自己的实现写断言。
 - 运行态：DSH 实例（端口 37657）`GET /dsh-sync-hub/state` → 200、`plugin.version=0.5.0`；hmr 已启用，改模块源码保存即自动重载（t+2s 实测，见 8.5）。
+
+### 9.5 分区模型收尾（2026-11-07 16:50）
+
+- `lib/engine.mjs`：设备记录（`manifest.devices[本机].sections`）之前只按 `settings.sections` 过滤，**`custom` 的开关在 `customPaths` 上 → 明明开着自定义路径，远端设备记录里却看不到这一项**。改为 `on || (id === 'custom' && customEnabled(settings))`。
+- `lib/engine.mjs`：`pullEntry` 现在也保留 `meta.kind === 'files'`（原来只保留 `session` / `redacted`）。
+  - 为什么必须保留：**开了「凭据与密钥」的 cordis 条目是明文**（`collectCordis` 里 `keepInline=true` → `meta.kind='files'`，`redactText(..., {keepInlineSecrets:true})` 原样返回，文本里根本不会出现 `<redacted>`）。
+  - 旧行为：meta 被丢掉 → `writeEntry` 回落到分区默认 `kind='redacted'` → 走 `mergeRedactedText` 合并路径 → 明文文件被当成脱敏副本处理，**用户本机的内容会被远端骨架改写**。
+  - 新行为：`kind='files'` → 整文件原子落地，明文内容原样同步（这才是「开了密钥同步就把配置完整搬过去」的预期）。
+- `lib/engine.mjs`：push / pull 分支的 sha 记账（`state.localSha`）用 try/catch 包住，记账失败只记 note，**不拖垮整轮同步**；pull 时若远端条目没有 `canonicalSha`，则清掉挂起项、不写 localSha。
+- 新增测试：
+  - `tests/section-model.test.mjs`（26 项断言）：`customEnabled` 单元、custom 不依赖 `settings.sections.custom`、设备记录含 custom、快照 custom 行 enabled 跟随 customPaths、push 后 `state.base` / `state.localSha` 都等于远端 sha、**开了密钥同步的 cordis 明文条目按整文件落地**（用「A 的文件里字面写 `<redacted>`」区分合并路径与整文件路径）。
+  - `tests/custom-section.test.mjs`：自定义路径分区的脱敏副本合并、不写占位文件、老 manifest（无 meta）也要挡住。
+  - `tests/state-baseline.test.mjs`：状态基线与白名单往返。
