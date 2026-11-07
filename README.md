@@ -64,15 +64,29 @@ dsh plugin --profile <profile> add file:D:\dsh-sync-hub
 
 `desktop` profile 里本插件若以 `file:` 目录依赖登记，pnpm 每次装别的插件都会重新导入它，
 用 `rename` 覆盖 `node_modules` 下已存在的目录链接 —— Windows 不允许 rename 覆盖目录链接，
-于是**装任何插件都失败**（`[ERR_PNPM_EPERM] ... rename`）。改成 `link:` 协议即可
-（pnpm 只维护链接、不再重新导入，插件仍直连工作区，热重载与本地开发不受影响）：
+于是**装任何插件都失败**（`[ERR_PNPM_EPERM] ... rename`）。**退出 DSH 也没用**：
+这不是「文件被占用」，在空目录里 rename 覆盖 junction 一样会 EPERM。
+
+改成 `link:` 协议即可（pnpm 只维护链接、不再重新导入，插件仍直连工作区，热重载与本地开发不受影响）：
 
 ```bash
 node scripts/repair-profile-link.mjs            # 演练：只打印将要做的改动
 node scripts/repair-profile-link.mjs --apply    # 实际执行（先自动备份到 <DSH_HOME>/plugin-backups/）
 ```
 
+脚本一次处理四个点，少任何一个都可能还是失败：
+
+1. `package.json`：`dependencies.dsh-sync-hub` → `link:<本仓库绝对路径>`；
+2. `pnpm-lock.yaml`：importers 同步改成 `link:`，删掉旧的 `dsh-sync-hub@file:` 条目，并删掉
+   `package.json` 里已经不存在的依赖（否则 `--frozen-lockfile` 直接报 `ERR_PNPM_OUTDATED_LOCKFILE`）；
+3. `node_modules/.modules.yaml`：清掉指向项目搬家前旧路径的 `injectedDeps` / `hoistedLocations`，
+   并把 `virtualStoreDir` 对齐到当前 profile；
+4. 跑 `pnpm install --frozen-lockfile --store-dir=<.modules.yaml 记录的 store 目录>`：
+   **必须显式带 `--store-dir`**，否则 pnpm 拿默认 store 目录跟记录值比对，判定 modules 目录不兼容、
+   想整体重建 `node_modules`（无 TTY 时报 `ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY`）。
+
 > 该脚本会写 profile 的 `package.json` / `pnpm-lock.yaml` / `node_modules/.modules.yaml`，请自行确认后再执行。
+> 冻结模式不会重新解析版本，因此不会偷偷升级其它插件。
 
 ## 二之二、它会访问什么（安全声明）
 

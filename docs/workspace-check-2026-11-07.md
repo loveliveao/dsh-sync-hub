@@ -372,8 +372,9 @@
 GameViewer / SystemSettings` 等 GUI 程序，**没有任何可见控制台窗口**。
 
 结论：弹窗来自**宿主在安装插件时调 pnpm**，与本插件无关；本插件侧已确保所有子进程隐藏窗口。
-规避方式：安装插件前先完全退出 DSH（pnpm 要改写 profile 的 node_modules，运行中的 DSH 持锁，
-这同时也是「文件被占用」报错的原因，见 5.1）。
+要彻底消除只能让宿主调 pnpm 时带 `windowsHide`（宿主侧改动）。
+注：早前这里写的「安装插件前先完全退出 DSH」是**错的建议** —— 13.1 实测证明
+「应用市场装插件报 EPERM」与 DSH 是否运行、文件是否被占用无关，退出 DSH 解决不了。
 
 ### 12.2 Git 同步状态
 
@@ -386,3 +387,61 @@ GameViewer / SystemSettings` 等 GUI 程序，**没有任何可见控制台窗�
   因此第十一节的 `remote.path` 净化不会破坏 Git 通道（已逐行核对 git.mjs:78/151-166/198/207/241/380）。
   现在同步计划提示「还没有设置 Git 仓库地址」，只是因为 `remote.repo` 为空 —— 属于**未配置**，不是缺陷。
   用户决定：**等有私有仓库再配**（插件会同步 DSH 配置 / 插件 / 会话，公共仓库等于外泄）。
+
+## 十三、应用市场装插件 EPERM：根因与修复（2026-11-07 18:00，全部实测）
+
+### 13.1 现象与「退出 DSH 没用」的实测
+
+宿主插件管理器装 `dsh-skills-manager` 三次（16:18:34 / 16:20:22 / 16:23:19）全部同一个错：
+
+```
+[ERR_PNPM_EPERM] [importPackage ...\node_modules\dsh-sync-hub] EPERM: operation not permitted,
+rename '...\node_modules\dsh-sync-hub_tmp_23988_5' -> '...\node_modules\dsh-sync-hub'
+```
+
+在临时目录复现：**空无一进程**时 `fs.rename(tmpDir, existingJunction)` 同样报
+`EPERM: operation not permitted, rename ...` → **Windows 不允许 rename 覆盖目录链接**，
+与 DSH 是否运行、文件是否被占用**无关** → 「完全退出 DSH 再装」这条建议是错的，已撤回。
+
+### 13.2 三个叠加的根因
+
+1. **依赖协议写成 `file:` 目录依赖** → pnpm 每次 install 都要重新导入本插件，
+   而导入的实现是「建临时目录 → rename 覆盖目标目录」→ 目标已是 junction → EPERM。
+   pnpm 行为实测：它会删「自己管着」的依赖，**完全不动**「它不认识的」目录和 junction。
+2. **`node_modules/.modules.yaml` 里记着项目搬家前的旧路径**
+   （`injectedDeps: { "D:/VibeCoding/scratch/dsh-sync-hub": [...] }` 与对应的 `hoistedLocations`）
+   → pnpm 每次 install 都要「修复」这个不一致 → 触发第 1 条的重新导入。
+3. **自己跑 pnpm install 时必须显式带 `--store-dir`**：`.modules.yaml` 记录的 store 是
+   `C:\Users\HUAWEI\AppData\Local\pnpm\store\v11`，而直接跑 pnpm（进程环境变量为空）时生效值是
+   `C:\Users\HUAWEI\.pnpm\store\v11` → `checkCompatibility` 判定 modules 目录不兼容 → 想整体重建
+   `node_modules` → 无 TTY 时报 `ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY`。
+   宿主装插件时**不会**触发这条（宿主 pnpm 用的就是 LOCALAPPDATA store，证据在
+   `profile/.plugin-manager/logs/operation-KYakrb/pnpm.log`）。
+
+另有两个必须注意的坑：profile 根目录的 `pnpm-workspace.yaml`（`nodeLinker: hoisted`、
+`autoInstallPeers: false`）不能少，缺了会报 `ERR_PNPM_LOCKFILE_CONFIG_MISMATCH`；
+lockfile 里还有 `package.json` 已不存在的孤儿依赖 `dsh-useful-tools@^0.2.4`，
+冻结模式下会报 `ERR_PNPM_OUTDATED_LOCKFILE`，必须一并清掉。
+
+### 13.3 修复（已实装在 desktop profile）
+
+备份 `C:\Users\HUAWEI\.dsh\plugin-backups\2026-11-07-18-15`（package.json / pnpm-lock.yaml /
+node_modules\.modules.yaml / node_modules-listing-before.json）后：
+
+1. `package.json`：`dependencies.dsh-sync-hub` → `link:D:/dsh-sync-hub`；
+2. `pnpm-lock.yaml`：importers 同步改成 `link:`，删掉 `dsh-sync-hub@file:` 与孤儿 `dsh-useful-tools`
+   的 importers / packages / snapshots 三处条目；
+3. `node_modules/.modules.yaml`：`injectedDeps` 清空、`hoistedLocations` 去掉 dsh-sync-hub；
+4. `pnpm install --frozen-lockfile --store-dir=C:\Users\HUAWEI\AppData\Local\pnpm\store\v11` → **exit 0**，
+   输出 `Lockfile is up to date, resolution step is skipped`（冻结模式不重新解析版本，**没有升级任何插件**）。
+
+### 13.4 验证（实测）
+
+- `node_modules` 顶层 260 → 261（只多出 pnpm 把上次失败留下的半成品
+  `@michengai/dsh-skills-manager` 挪进的 `.ignored` 目录），**没有任何包消失**；
+- `node_modules\dsh-sync-hub` 仍是 junction → `D:\dsh-sync-hub`（本地插件版本 0.5.0，热重载不受影响）；
+- **模拟市场安装** `pnpm add file:<dummy>` → **exit 0、无 EPERM、无整体重建**；
+  随后 `pnpm remove dsh-dummy-probe` → exit 0，package.json 回到 15 个依赖、dummy 无残留；
+- 修复配方固化成仓库脚本 `scripts/repair-profile-link.mjs`（默认演练、`--apply` 实执行、自动备份），
+  并在**坏状态夹具**上跑通：孤儿依赖删净、`link:` 生效、`pnpm install` 12.6s 完成且未触发重建、
+  `node_modules\dsh-sync-hub` 正确指向仓库。
