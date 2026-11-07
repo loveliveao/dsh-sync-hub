@@ -352,3 +352,37 @@
 - **负向对照**：把 `lib/sections.mjs` / `lib/engine.mjs` / `lib/state.mjs` / `lib/workspaces.mjs`
   回退到修复前版本后重跑 → **13 项断言失败**，其中「外部目录里没有生成文件」失败并显示
   修复前**真的在 DSH_HOME 之外创建了文件** —— 证明这条防护确实咬住了漏洞。
+
+## 十二、「PowerShell 框」溯源 + Git 同步状态（2026-11-07 17:30，全部实测）
+
+### 12.1 桌面偶发弹出控制台窗口：不是本插件
+
+用户反馈「我的电脑怎么有时候还蹦出来 powershell 的框」。用「枚举全机顶层窗口 + 进程可见性」
+逐个排除，结论如下（均为实测，不是推测）：
+
+| 来源 | 实测结果 | 是否会弹窗 |
+| --- | --- | --- |
+| 插件自身的 git 子进程 | `lib/util.mjs:97` `execFileP` → `execFile(..., { windowsHide: true })`（第 105 行） | **不会** |
+| harness 的 `pwsh` 工具 | 运行期间确实创建了 `ConsoleWindowClass` 窗口（pid 2636），但 `IsWindowVisible=False`（隐藏窗口） | **不会** |
+| agent 的 `run_code` 子进程 | 枚举全机 354 个顶层窗口，运行期间**没有**任何可见 console 窗口；已统一改为 `windowsHide: true` | **不会** |
+| **宿主 `dsh-plugin-manager` 调 pnpm** | profile `.plugin-manager/logs/` 显示今天 **16:18:34 / 16:20:22 / 16:23:19** 连跑三次 pnpm（正是应用市场装 `dsh-skills-manager` 的时段）；宿主调 pnpm 时**没有** `windowsHide`，而 Windows 上 pnpm 是 `.cmd` 脚本（经 cmd.exe 执行） | **会** |
+
+判定依据：用 `EnumWindows` + `IsWindowVisible` 枚举顶层窗口（临时脚本 `.dev/` 下，未入库），
+基线与各次测量之间做差集。基线可见窗口只有 `explorer / DeepSeek Harness / msedge / PixPin /
+GameViewer / SystemSettings` 等 GUI 程序，**没有任何可见控制台窗口**。
+
+结论：弹窗来自**宿主在安装插件时调 pnpm**，与本插件无关；本插件侧已确保所有子进程隐藏窗口。
+规避方式：安装插件前先完全退出 DSH（pnpm 要改写 profile 的 node_modules，运行中的 DSH 持锁，
+这同时也是「文件被占用」报错的原因，见 5.1）。
+
+### 12.2 Git 同步状态
+
+- **仓库本身**：远端 `origin = https://github.com/loveliveao/dsh-sync-hub.git`。
+  此前一直「只提交不推送」，本地 master 累计领先 5 个提交（272a47b / a7118aa / 769eee7 / 20df194 / 28edd65），
+  GitHub 上还是旧的 c83fea1。用户确认后已推送：**`c83fea1..28edd65  master -> master`**（exit=0），
+  推送后 `git status -sb` 显示本地与 `origin/master` 齐平。
+- **插件的 Git 同步通道**：没坏。`lib/transport/git.mjs` 用的是 `settings.remote.repo`（仓库 URL）
+  + `gitWorkdir()`（`$DSH_HOME/sync-hub/remote-git`），**不读** `settings.remote.path`，
+  因此第十一节的 `remote.path` 净化不会破坏 Git 通道（已逐行核对 git.mjs:78/151-166/198/207/241/380）。
+  现在同步计划提示「还没有设置 Git 仓库地址」，只是因为 `remote.repo` 为空 —— 属于**未配置**，不是缺陷。
+  用户决定：**等有私有仓库再配**（插件会同步 DSH 配置 / 插件 / 会话，公共仓库等于外泄）。
