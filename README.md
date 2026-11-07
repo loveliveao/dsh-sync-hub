@@ -266,7 +266,7 @@ HTTP 接口（前缀 `/dsh-sync-hub`）：`GET /state`、`GET /status?remote=1`�
 ## 九、开发
 
 ```bash
-npm test                     # 一次跑完 12 个测试文件（node --test 报 14 个顶层用例）
+npm test                     # 一次跑完 14 个测试文件
 node tests/smoke.mjs           # 无宿主冒烟：采集 → 推送 → 二次计划 → 伪造远端会话可拉取
 node tests/secrets.test.mjs    # 凭据开关：关闭时不上传，打开时只放行那 3 个已知文件
 node tests/transport.test.mjs  # 三种通道的检查步骤与「不泄漏令牌」
@@ -280,6 +280,8 @@ node tests/archive.test.mjs        # 会话归档：只增不减、写盘前备�
 node tests/archive-registry.test.mjs  # 归档走宿主注册表：宿主优先、失败回落文件
 node tests/plugin-config.test.mjs  # 插件配置解析：嵌套、行内注释、!!js、敏感键脱敏
 node tests/contract-endpoints.test.mjs  # /plugins 与 /workspaces 的字段形状
+node tests/security.test.mjs       # 接口访问控制：跨站/非回环/非 JSON 一律拒绝
+node tests/p0-sync-safety.test.mjs  # 同步安全：真实值不被占位符顶掉、不反复拉取
 ```
 
 目录：

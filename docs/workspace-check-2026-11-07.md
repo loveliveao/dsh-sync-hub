@@ -24,20 +24,20 @@
 
 ## 二、P0（必须先修）
 
-### P0-1 ✅ 同步接口零鉴权 + 无 Origin 校验 → 跨站可把 DSH 数据推给攻击者
+### P0-1 ✅ 同步接口零鉴权 + 无 Origin 校验 → 跨站可把 DSH 数据推给攻击者  `（已于 2026-11-07 修复，见第九节）`
 - 位置：`lib/server.mjs:32-97`（全部路由）、`lib/server.mjs:14-30`（readBody 不校验 Content-Type）、`index.js`（`ctx.webServer.register({kind:'prefix', path:'/dsh-sync-hub'})`）
 - 依据：DSH 宿主只为 **/api 路由与 stream** 提供 Origin / 会话校验；本插件注册的是普通 `prefix` 路由，**不在保护范围内**。全仓 grep `origin|referer|sec-fetch|authorization|csrf` 零命中。
 - 攻击链：任意网页 → `POST /dsh-sync-hub/settings`，body 用 `content-type: text/plain`（CORS 简单请求，**免预检**）→ 服务端无条件 `JSON.parse` → 把 transport 改成 git 并指向攻击者仓库、打开 secrets 开关 → `POST /run` 把 DSH_HOME 推走 → `POST /secret` 顶掉已存 token。
 - 附带：`lib/server.mjs:66` 的 `body.settings || body` 兜底让裸 body 覆盖顶层设置，是这条链能生效的关键一环。
 - 修法：① 校验 `Origin` / `Sec-Fetch-Site` 同源；② POST 只接受 `application/json`（跨站被迫预检，服务端不发 CORS 头即失败）；③ 加一次性 token 走自定义头；④ 复用宿主 `ctx.connection.requestRejection()`。
 
-### P0-2 ✅ ignoreAfterPull 被状态白名单丢弃 → 每次同步都重复拉取 / 合并 / 覆写 / 备份
+### P0-2 ✅ ignoreAfterPull 被状态白名单丢弃 → 每次同步都重复拉取 / 合并 / 覆写 / 备份  `（已于 2026-11-07 修复，见第九节）`
 - 位置：`lib/state.mjs:164-182`（normalizeState 白名单）、`lib/state.mjs:58-73`（defaultState）、`lib/state.mjs:193-200`（saveState）；写入方 `lib/engine.mjs:390/445`，消费方 `lib/engine.mjs:97/128-132`
 - 实测：`normalizeState({ignoreAfterPull:{...}})` → `undefined`；磁盘上永远没有该字段 → 补丁是死代码。
 - 叠加基线漂移（`lib/engine.mjs:411` 记本地 `canonicalSha` 而非远端 `entry.sha`），每轮必定重判 `'pull'`：同一文件反复拉取、反复覆写、每次新建一个备份目录。
 - 修法：normalizeState 补 `ignoreAfterPull: asObject(input.ignoreAfterPull)`、defaultState 补 `{}`；同时 `base[id] = entry.sha`（远端基线），本地 sha 另存 `state.localSha`。
 
-### P0-3 ✅ custom 分区拉取会抹掉用户真实值
+### P0-3 ✅ custom 分区拉取会抹掉用户真实值  `（已于 2026-11-07 修复，见第九节）`
 - 位置：`lib/sections.mjs:409-411`（对 .yml/.json/.env/.ini/.toml 做 redactText 但 `meta=null`，见 `bufEntry` `sections.mjs:136`）、`SECTION_DEFS`（`lib/sections.mjs:30-101`）无 custom 项 → `lib/engine.mjs:270` kind 落 files → `lib/engine.mjs:280-289` 把**含 <redacted> 的 blob 原子写回用户文件**
 - 修法：collectCustom 传 `meta:{kind:'redacted'}` 并给 SECTION_DEFS 补 custom（与 cordis 同走合并路径）。
 
@@ -204,3 +204,49 @@
 - **踩坑记录（下次别再踩）**：hmr 只监听**模块文件**（`.js` / `.mjs`）。改 `package.json`（哪怕只是版本号）不会触发重载，模块顶层的 `pluginVersion()` 也就不会重跑 → 拿 package.json 当探针会得出「热重载没生效」的错误结论。
 - **附带修正**：profile 的插件依赖现在是 `"dsh-sync-hub": "file:local-plugins/dsh-sync-hub"`（不再指向已废弃的 `file:D:/VibeCoding/scratch/dsh-sync-hub`）；`node_modules\dsh-sync-hub` 与 `local-plugins\dsh-sync-hub` **都是指向 `D:\dsh-sync-hub` 的 junction** → 运行实例加载的就是工作区代码。
 
+
+
+---
+
+## 九、P0 安全修复（2026-11-07 16:40，全部实测）
+
+### 9.1 P0-1：接口访问控制（`lib/server.mjs`）
+
+新增导出 `checkAccess(hub, req, method)`，在路由分发**之前**拦截，五层：
+
+| 层 | 判据 | 拒绝码 | 拒绝语 |
+| --- | --- | --- | --- |
+| 宿主会话 | `ctx.get('connection').requestRejection(req)`（401/403 直接拒；抛异常则退回本地校验） | 401/403 | 宿主原文 |
+| 跨站标记 | `Sec-Fetch-Site` ∉ {same-origin, same-site, none} | 403 | 检测到跨站请求，已拒绝 |
+| 回环栅栏 | `Host` 不是 `127.0.0.1` / `localhost` / `::1` | 403 | 只接受本机访问 |
+| 来源同源 | `Origin`（没有则看 `Referer`）与本机不同源 / 不同端口 | 403 | 请求来源不是本机同源地址，已拒绝 |
+| 内容类型 | POST 的 `Content-Type` 不是 `application/json` | 415 | 请求必须使用 application/json |
+
+设计取舍：
+
+- **不往 `index.js` 的 `inject` 里加 `connection`**（AGENTS.md 规则②：插件不得影响宿主行为）→ 用 `ctx.get('connection')` + try/catch 取，取不到就退回本地四层校验。
+- 复用宿主 `requestRejection()` 而不是自己发明 token：浏览器会话与 peer 鉴权宿主已经管了。
+- CORS 简单请求（`content-type: text/plain`）被第 5 层挡掉；跨站读响应本来就被同源策略挡住，写操作被第 2/4 层挡住。
+
+### 9.2 P0-2：状态白名单 + 基线
+
+- `lib/state.mjs`：`defaultState` 补 `ignoreAfterPull: {}` 与 `localSha: {}`；`normalizeState` 补 `ignoreAfterPull: normalizeIgnore(input.ignoreAfterPull)`（只保留 `{localSha, remoteSha}` 字符串对，非法项丢弃）与 `localSha: asObject(input.localSha)`。
+- `lib/engine.mjs`：拉取后基线记**远端这一版的 sha**（`state.base[entry.id] = entry.sha`），本机规范形态 sha 另存 `state.localSha[entry.id]`。
+  - 原因：`decide()` 是拿 `base` 与远端 `entry.sha` 比对；基线记本机 `canonicalSha` 会漂移 → 每轮都重判（要么反复拉取/合并/覆写/备份，要么把本机版本推回远端）。
+
+### 9.3 P0-3：脱敏副本合并 + 不写占位文件
+
+- `lib/sections.mjs`：`collectCustom` 对 `.yml/.json/.env/.ini/.toml` 文本配置脱敏后入集合，并打 `meta:{kind:'redacted'}`；目录分支经 `collectTree` 新增的 `transform`/`metaFor` 逐文件处理。
+- `lib/engine.mjs`：`pullEntry` 保留 `meta.kind==='redacted'`（原来只保留 `session`，标记在拉取途中被丢）；`writeEntry` 按 `entry.meta.kind` 走 `mergeRedactedText` —— **以远端文本为骨架，`<redacted>` 的行用本机同名键的真实值回填，本机没有该键则丢弃该行**。
+- 额外补一条：**本机没有这个文件时，不写远端那份脱敏副本**（否则用户拿到的是一份写着 `<redacted>` 的假配置）；计划里以 `skipped` 列出并给出原因。
+- 与原报告修法的差异：原 P0-3 建议「给 `SECTION_DEFS` 补 custom」。**这里没有这样做** —— `custom` 分区由 `settings.customPaths` 单独控制，本来就不是用户开关位；补进 `SECTION_DEFS` 会平白多出一个设置项并改掉设置 schema。合并语义与 cordis 一致，但入口不同。
+
+### 9.4 验证（实测）
+
+- 全量：**14 个测试文件逐个 `node` 直跑全部 exit=0**（含新增 `tests/security.test.mjs` 20 项断言、`tests/p0-sync-safety.test.mjs` 26 项断言）。
+- **负向对照**（关键一步）：把 `lib/state.mjs`、`lib/engine.mjs`、`lib/sections.mjs` 在**临时副本**里回退到修复前的 HEAD 版本，再跑 `p0-sync-safety.test.mjs` → **exit=1**，复现出原始症状：
+  - B 的真实密钥 `sk-bbbbbbbbbbbbbbbb` 被 `<redacted>` 顶掉（文件内容变成 `api_key: <redacted>`）；
+  - 本机没有的文件被生成为占位文件（`custom/only-a.yml` 里写着 `<redacted>`）；
+  - `saveState` → `loadState` 后 `ignoreAfterPull` 直接消失（状态白名单丢字段）。
+  → 说明测试确实咬住了 bug，而不是对着自己的实现写断言。
+- 运行态：DSH 实例（端口 37657）`GET /dsh-sync-hub/state` → 200、`plugin.version=0.5.0`；hmr 已启用，改模块源码保存即自动重载（t+2s 实测，见 8.5）。
