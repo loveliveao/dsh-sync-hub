@@ -46,7 +46,7 @@
 ## 三、P1（高，已实测复现为主）
 
 ### 隐私 / 脱敏
-1. ✅ **全大写值被当环境变量引用**（`lib/privacy.mjs:40,91-101`）→ `api_key: AKIAIOSFODNN7EXAMPLE` 原样上传。
+1. ✅ **全大写值被当环境变量引用**（`lib/privacy.mjs:40,91-101`）→ 形如 `api_key: <全大写的 AWS 访问键样例>` 的值原样上传。
 2. ✅ **键名 ^...$ 锚定**（`lib/privacy.mjs:38,125`）→ `aws_secret_access_key`、`aws_access_key_id`、`auth_token`、`passphrase`、`api_secret`、`openai_api_key`、`ssh_key`、`jwt`、`bearer` 全部不脱敏；`apiToken` 亦漏。
 3. ✅ **短于 8 字符不脱敏**（`lib/privacy.mjs:98`）→ `password: abc123` 原样。
 4. ✅ **块标量 / 流式 YAML / 单行与嵌套 JSON 整段漏脱敏**（`lib/privacy.mjs:122` + `lib/sections.mjs:410,24`）→ 已导入的 `redactJson` 从未调用，是死导入。

@@ -122,15 +122,15 @@ async function main() {
   check('webdav 失败步骤被跳过时写明原因', davRes.steps.filter((s) => !s.ok).every((s) => s.detail.length > 0))
 
   console.log('\n[5] 凭据不外泄')
-  const secret = 'SECRET-TOKEN-abc123'
-  const gitSecret = gitTransport({ remote: { repo: 'http://127.0.0.1:9/x/y.git' } }, { git: secret })
+  const dummyToken = 'placeholder-not-a-real-token'
+  const gitSecret = gitTransport({ remote: { repo: 'http://127.0.0.1:9/x/y.git' } }, { git: dummyToken })
   const gitResSecret = await gitSecret.test()
   const dumped = JSON.stringify(gitResSecret)
-  check('返回值里不出现令牌明文', !dumped.includes(secret))
-  check('返回值里不出现 base64 认证头', !dumped.includes(Buffer.from(`x-access-token:${secret}`, 'utf8').toString('base64')))
-  const davSecret = webdavTransport({ remote: { url: 'http://127.0.0.1:9/dav', username: 'me' } }, { webdav: 'p@ssw0rd-secret' })
+  check('返回值里不出现令牌明文', !dumped.includes(dummyToken))
+  check('返回值里不出现 base64 认证头', !dumped.includes(Buffer.from(`x-access-token:${dummyToken}`, 'utf8').toString('base64')))
+  const davSecret = webdavTransport({ remote: { url: 'http://127.0.0.1:9/dav', username: 'me' } }, { webdav: 'placeholder-not-a-real-password' })
   const davResSecret = await davSecret.test()
-  check('webdav 返回值里不出现密码', !JSON.stringify(davResSecret).includes('p@ssw0rd-secret'))
+  check('webdav 返回值里不出现密码', !JSON.stringify(davResSecret).includes('placeholder-not-a-real-password'))
 
   await rm(scratch, { recursive: true, force: true })
   await rm(fakeHome, { recursive: true, force: true })

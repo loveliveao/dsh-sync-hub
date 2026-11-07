@@ -32,7 +32,7 @@
     "tests/defensive.test.mjs"
   ],
   "engines": {
-    "dsh": ">=0.2.1-rc.5",
+    "dsh": ">=0.2.1-rc.5 <0.2.2 || >=0.2.2-rc.1",
     "node": ">=20"
   },
   "dependencies": {},
@@ -56,8 +56,19 @@
     "dsh-plugin",
     "sync",
     "backup",
-    "sessions"
+    "sessions",
+    "config-sync",
+    "session-sync",
+    "multi-device",
+    "developer-tools",
+    "settings-backup"
   ],
   "license": "MIT",
-  "icon": "./icon.svg"
+  "icon": "./icon.svg",
+  "scripts": {
+    "test": "node --test \"tests/*.test.mjs\""
+  },
+  "author": {
+    "name": "dsh-sync-hub contributors"
+  }
 }

@@ -31,17 +31,17 @@ async function main() {
   process.env.DSH_HOME = fakeHome
 
   console.log('\n[1] 令牌不进命令行')
-  const secret = 'SECRET-TOKEN-guard-abc123'
-  const git = gitTransport({ remote: { repo: 'https://example.invalid/x/y.git' } }, { git: secret })
+  const dummyToken = 'placeholder-not-a-real-token'
+  const git = gitTransport({ remote: { repo: 'https://example.invalid/x/y.git' } }, { git: dummyToken })
   const env = await git.authEnv()
   check('authEnv 返回 GIT_CONFIG_COUNT', env.GIT_CONFIG_COUNT === '2', String(env.GIT_CONFIG_COUNT))
   check('认证头在环境变量里', String(env.GIT_CONFIG_VALUE_0 || '').includes('Authorization: Basic'))
-  check('环境变量里是 base64 而不是明文令牌', !String(env.GIT_CONFIG_VALUE_0 || '').includes(secret))
+  check('环境变量里是 base64 而不是明文令牌', !String(env.GIT_CONFIG_VALUE_0 || '').includes(dummyToken))
   check('credential.helper 被置空', env.GIT_CONFIG_VALUE_1 === '')
   check('新 git 不再往命令行塞认证头', git.authArgsFor(env).length === 0, git.authArgsFor(env).join(' '))
   const legacy = git.legacyAuthArgs()
   const legacyJoined = legacy.join(' ')
-  check('老 git 退路里也只有 base64，没有明文令牌', !legacyJoined.includes(secret))
+  check('老 git 退路里也只有 base64，没有明文令牌', !legacyJoined.includes(dummyToken))
   check(
     '不设置 MSYS2_ARG_CONV_EXCL（会弄坏 git 自己的 upload-pack 调用）',
     env.MSYS2_ARG_CONV_EXCL === undefined && env.MSYS_NO_PATHCONV === undefined,
