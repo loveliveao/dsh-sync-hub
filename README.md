@@ -60,6 +60,20 @@ dsh plugin --profile <profile> add file:D:\dsh-sync-hub
 
 没有运行时依赖（只用 `node:*` 内置模块），因此不会往 profile 里引入任何第三方包。
 
+#### 修好「应用市场装插件报 EPERM」
+
+`desktop` profile 里本插件若以 `file:` 目录依赖登记，pnpm 每次装别的插件都会重新导入它，
+用 `rename` 覆盖 `node_modules` 下已存在的目录链接 —— Windows 不允许 rename 覆盖目录链接，
+于是**装任何插件都失败**（`[ERR_PNPM_EPERM] ... rename`）。改成 `link:` 协议即可
+（pnpm 只维护链接、不再重新导入，插件仍直连工作区，热重载与本地开发不受影响）：
+
+```bash
+node scripts/repair-profile-link.mjs            # 演练：只打印将要做的改动
+node scripts/repair-profile-link.mjs --apply    # 实际执行（先自动备份到 <DSH_HOME>/plugin-backups/）
+```
+
+> 该脚本会写 profile 的 `package.json` / `pnpm-lock.yaml` / `node_modules/.modules.yaml`，请自行确认后再执行。
+
 ## 二之二、它会访问什么（安全声明）
 
 给审核者看的一页速览：插件只在你装了它的那台机器上工作，不自带后台进程，不常驻外联。
