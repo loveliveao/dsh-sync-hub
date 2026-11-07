@@ -193,6 +193,14 @@
 
 - **依据**：base bundle `@deepseek-ai/dsh-base` 的 `cordis.patch.yml` 本就带 `- id: hmr`（`config.root: []`，官方注释「模块监听是 opt-in」），且该文件头写明「后续 bundle patch 与用户 profile `cordis.patch.yml` 按 id 定位同一行，后者**整块替换** `config`」；官方 README 要求**在启动前**通过 profile patch 配置这一行。同 bundle 已有 `- id: timer`，所以不需要额外加 timer 条目。
 - **校验**：js-yaml 与 yaml(eemeli) 双解析器均解析成功 → 17 条顶层条目、末条 `id=hmr` / `root=["local-plugins"]` / `debounce=300`、无重复 id；文件保持 LF、无 BOM、未引入 `!!js` 标签。
-- **实测**：写入后运行实例仍在线（端口 36194，`GET /dsh-sync-hub/state` → 200，版本 0.4.0）。活体探针（临时把 `package.json` 版本改成 `0.4.1-hmrprobe`）**60s 内 `/state` 版本始终是 0.4.0** → 该行要**下次启动**才被 hmr 服务采用，与官方「启动前配置」一致。探针已还原（`package.json` 回到 0.4.0，git 干净）。
-- **待办**：需要重启一次 DSH 才生效；重启后再跑一次同样的版本探针即可确认热重载真的通了。
+- **第一轮实测（探针设计有误，结论已被 8.5 推翻）**：写入后运行实例仍在线（端口 36194，`GET /dsh-sync-hub/state` → 200，版本 0.4.0）。活体探针把 `package.json` 版本改成 `0.4.1-hmrprobe`，**60s 内 `/state` 版本始终是 0.4.0**。当时的结论是「该行要下次启动才生效」—— 这个结论**是错的**：那一轮改的是 `package.json`，而 hmr 只监听**模块文件**，`package.json` 根本不触发重载，探针本身无效。
+
+### 8.5 热重载已实测生效（2026-11-07 12:18，模块级探针）
+
+- **实例**：用户于 12:11:50 重启，新实例 pid 2832、GUI 端口 **44919**（端口每次重启都变，探测别写死）。
+- **探针**：改**模块文件**而不是 `package.json` —— 把 `index.js:19` 的 `const PLUGIN_VERSION = pluginVersion()` 临时改成 `const PLUGIN_VERSION = '0.4.2-hmrprobe'`，轮询 `GET /dsh-sync-hub/state`。
+- **结果**：**t+2s** 即返回版本 `0.4.2-hmrprobe` → 插件被自动重载；还原 `index.js` 后再次返回 `0.4.0` → 两次重载都成立。探针已还原，`git status` 干净。
+- **结论**：**热重载可用** —— 桌面 profile `cordis.patch.yml` 里那条 `- id: hmr`（`root: [local-plugins]`）生效了：改 `D:\dsh-sync-hub` 里的模块源码**保存即生效，不用重启 DSH**。
+- **踩坑记录（下次别再踩）**：hmr 只监听**模块文件**（`.js` / `.mjs`）。改 `package.json`（哪怕只是版本号）不会触发重载，模块顶层的 `pluginVersion()` 也就不会重跑 → 拿 package.json 当探针会得出「热重载没生效」的错误结论。
+- **附带修正**：profile 的插件依赖现在是 `"dsh-sync-hub": "file:local-plugins/dsh-sync-hub"`（不再指向已废弃的 `file:D:/VibeCoding/scratch/dsh-sync-hub`）；`node_modules\dsh-sync-hub` 与 `local-plugins\dsh-sync-hub` **都是指向 `D:\dsh-sync-hub` 的 junction** → 运行实例加载的就是工作区代码。
 

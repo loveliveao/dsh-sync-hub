@@ -43,6 +43,7 @@
 
 - 仓库真实路径：`D:\dsh-sync-hub`（旧的 `D:\VibeCoding\scratch\dsh-sync-hub` 已废弃，文档里不要再引用它）。
 - 桌面 profile 通过 junction 指向本工作区，改源码即改运行代码；但**部署**（pnpm install / 文件复制）仍由用户决定。
+- 桌面 profile 已启用 dsh-hmr（`cordis.patch.yml` 里 `- id: hmr`，`root: [local-plugins]`）：改完插件**模块文件**保存即自动重载，**不必重启 DSH**。注意 hmr 只监听模块文件，改 `package.json` 不会触发重载（2026-11-07 实测，见 `docs/workspace-check-2026-11-07.md` 8.5 节）。
 - 文档里的路径、命令要与实际一致，改完记得一起更新 README。
 
 ## 4. 验证口径
