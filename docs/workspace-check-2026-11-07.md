@@ -228,6 +228,9 @@
 - 复用宿主 `requestRejection()` 而不是自己发明 token：浏览器会话与 peer 鉴权宿主已经管了。
 - CORS 简单请求（`content-type: text/plain`）被第 5 层挡掉；跨站读响应本来就被同源策略挡住，写操作被第 2/4 层挡住。
 
+- 运行态实测（2026-11-07 16:43，实例端口 37657）：不带 cookie 请求 `GET /dsh-sync-hub/state` → **401 `未授权访问本机同步接口`**；同一时刻宿主自己的 `GET /api/session` → **401 `unauthorized`** → 两者保护级别一致。浏览器持有宿主的签名 cookie（authority 绑定）时 `isAuthenticated` 放行，因此前端不受影响（前端 fetch 走相对路径、同源，浏览器默认带 cookie）。
+- 预期副作用（如实记录）：任何外部脚本直连该接口都需要带宿主 cookie 或 API token，否则 401。这正是 P0-1 要的效果——同步设置/密钥/推送接口不再是「本机任意进程可调」。
+
 ### 9.2 P0-2：状态白名单 + 基线
 
 - `lib/state.mjs`：`defaultState` 补 `ignoreAfterPull: {}` 与 `localSha: {}`；`normalizeState` 补 `ignoreAfterPull: normalizeIgnore(input.ignoreAfterPull)`（只保留 `{localSha, remoteSha}` 字符串对，非法项丢弃）与 `localSha: asObject(input.localSha)`。
